@@ -44,7 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     migrate = subparsers.add_parser("migrate", help="Inventory legacy ARA AI experiment responsibilities.")
     migrate_sub = migrate.add_subparsers(dest="migrate_command", required=True)
     migrate_inventory = migrate_sub.add_parser("inventory", help="Build a read-only migration inventory.")
-    migrate_inventory.add_argument("--source", required=True, help="Path to the legacy auto-research-agent repo.")
+    migrate_inventory.add_argument("--source", required=True, help="Path to the legacy ARA platform repo.")
     migrate_inventory.add_argument("--json", action="store_true", help="Print JSON output.")
 
     benchmark = subparsers.add_parser("run-fixture-benchmark", help="Emit a deterministic fixture result bundle.")

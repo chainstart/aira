@@ -4,7 +4,7 @@ full_name: AI Research Agent Lab
 domain: ai_ml
 legacy:
   repo_names:
-    - auto-research-agent
+    - ara
   lab_ids:
     - ai_ml
 entrypoints:
