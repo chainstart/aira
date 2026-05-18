@@ -1,0 +1,14 @@
+{
+  "datasets": [
+    {
+      "id": "fixture-ai-classification",
+      "intended_use": "Smoke-test bundle emission and validator contracts.",
+      "name": "Deterministic fixture classification set",
+      "network_required": false,
+      "rows": 6,
+      "source": "local_synthetic",
+      "status": "placeholder"
+    }
+  ],
+  "schema_version": "aira.dataset_registry.v1"
+}

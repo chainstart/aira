@@ -1,0 +1,50 @@
+{
+  "benchmarks": [
+    {
+      "dataset_id": "fixture-ai-classification",
+      "emits_bundle_type": "aira_result_bundle",
+      "id": "fixture-classification-smoke",
+      "metric_ids": [
+        "accuracy",
+        "accuracy_delta"
+      ],
+      "model_ids": [
+        "fixture-threshold-classifier",
+        "fixture-majority-baseline"
+      ],
+      "name": "AIRA deterministic fixture benchmark",
+      "network_required": false,
+      "status": "mvp"
+    }
+  ],
+  "datasets": [
+    {
+      "id": "fixture-ai-classification",
+      "intended_use": "Smoke-test bundle emission and validator contracts.",
+      "name": "Deterministic fixture classification set",
+      "network_required": false,
+      "rows": 6,
+      "source": "local_synthetic",
+      "status": "placeholder"
+    }
+  ],
+  "models": [
+    {
+      "id": "fixture-threshold-classifier",
+      "implementation": "aira.benchmark.threshold_predict",
+      "intended_use": "Deterministic benchmark smoke only.",
+      "live_model_calls": false,
+      "name": "Fixture threshold classifier",
+      "status": "placeholder"
+    },
+    {
+      "id": "fixture-majority-baseline",
+      "implementation": "aira.benchmark.majority_predict",
+      "intended_use": "Local comparison baseline for fixture smoke.",
+      "live_model_calls": false,
+      "name": "Fixture majority baseline",
+      "status": "placeholder"
+    }
+  ],
+  "schema_version": "aira.registry.v1"
+}

@@ -1,0 +1,13 @@
+{
+  "benchmark_id": "fixture-classification-smoke",
+  "command": "python3 -m aira run-fixture-benchmark",
+  "deterministic": true,
+  "live_model_calls": false,
+  "metrics": {
+    "accuracy": 0.833333,
+    "accuracy_delta": 0.333333,
+    "baseline_accuracy": 0.5
+  },
+  "schema_version": "aira.reproduction_status.v1",
+  "status": "reproduced"
+}

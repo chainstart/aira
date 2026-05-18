@@ -1,0 +1,10 @@
+{
+  "benchmark_id": "fixture-classification-smoke",
+  "bundle_type": "aira_result_bundle",
+  "created_at": "2026-05-18T00:00:00Z",
+  "deterministic": true,
+  "domain": "ai_ml",
+  "live_model_calls": false,
+  "producer": "aira",
+  "schema_version": "ara.result_bundle.v1"
+}

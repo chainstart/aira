@@ -1,0 +1,56 @@
+lab_id: aira
+system_name: AIRA
+full_name: AI Research Agent Lab
+domain: ai_ml
+legacy:
+  repo_names:
+    - auto-research-agent
+  lab_ids:
+    - ai_ml
+entrypoints:
+  agent_cli:
+    - python3 -m aira
+  direct_tools:
+    - python3 -m aira bundles validate
+    - python3 -m aira migrate inventory
+    - python3 -m aira run-fixture-benchmark
+commands:
+  allow_prefixes:
+    - python3 -m aira
+  deny_patterns:
+    - rm -rf
+    - git reset --hard
+    - git checkout --
+    - PRIVATE_KEY
+    - MNEMONIC
+  smoke:
+    argv:
+      - python3
+      - -m
+      - aira
+      - labs
+      - inspect
+      - --json
+    side_effect_free: true
+    description: Inspect the AIRA lab manifest without running experiments.
+artifacts:
+  include:
+    - tests/fixtures/aira_result_bundle/**
+    - runs/*/aira_result_bundle/**
+  exclude:
+    - '**/__pycache__/**'
+bundles:
+  produced:
+    - aira_result_bundle
+registries:
+  datasets: aira/registries/datasets.json
+  models: aira/registries/models.json
+  benchmarks: aira/registries/benchmarks.json
+environment:
+  required: []
+  optional: []
+safety:
+  max_wall_time_minutes: 5
+  network_policy: none
+  destructive_commands: false
+  live_model_calls: false

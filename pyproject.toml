@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aira"
+version = "0.1.0"
+description = "AI Research Agent lab contract and deterministic experiment bundle fixtures."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.scripts]
+aira = "aira.cli:main_entry"
+
+[tool.setuptools.packages.find]
+include = ["aira*"]
+
+[tool.setuptools.package-data]
+aira = ["registries/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

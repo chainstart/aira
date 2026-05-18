@@ -1,0 +1,21 @@
+{
+  "models": [
+    {
+      "id": "fixture-threshold-classifier",
+      "implementation": "aira.benchmark.threshold_predict",
+      "intended_use": "Deterministic benchmark smoke only.",
+      "live_model_calls": false,
+      "name": "Fixture threshold classifier",
+      "status": "placeholder"
+    },
+    {
+      "id": "fixture-majority-baseline",
+      "implementation": "aira.benchmark.majority_predict",
+      "intended_use": "Local comparison baseline for fixture smoke.",
+      "live_model_calls": false,
+      "name": "Fixture majority baseline",
+      "status": "placeholder"
+    }
+  ],
+  "schema_version": "aira.model_registry.v1"
+}

@@ -1,0 +1,34 @@
+{
+  "artifacts": [
+    {
+      "artifact_id": "benchmark_report",
+      "description": "Deterministic fixture benchmark report.",
+      "kind": "benchmark_report",
+      "path": "artifacts/benchmark_report.json"
+    },
+    {
+      "artifact_id": "reproduction_status",
+      "description": "Local reproduction status for the fixture benchmark.",
+      "kind": "reproduction_status",
+      "path": "artifacts/reproduction_status.json"
+    },
+    {
+      "artifact_id": "metrics_table",
+      "description": "Metrics supporting the fixture benchmark claim.",
+      "kind": "metrics_table",
+      "path": "artifacts/metrics_table.csv"
+    },
+    {
+      "artifact_id": "dataset_fixture",
+      "description": "Local synthetic fixture data used by the smoke benchmark.",
+      "kind": "dataset",
+      "path": "artifacts/dataset_fixture.csv"
+    },
+    {
+      "artifact_id": "registry_snapshot",
+      "description": "Dataset, model, and benchmark registry placeholders.",
+      "kind": "registry_snapshot",
+      "path": "artifacts/registry_snapshot.json"
+    }
+  ]
+}

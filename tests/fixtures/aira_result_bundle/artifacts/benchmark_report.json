@@ -1,0 +1,59 @@
+{
+  "baseline_model_id": "fixture-majority-baseline",
+  "benchmark_id": "fixture-classification-smoke",
+  "dataset_id": "fixture-ai-classification",
+  "deterministic": true,
+  "examples": [
+    {
+      "baseline_prediction": 1,
+      "example_id": "fx-001",
+      "label": 1,
+      "prediction": 1,
+      "score": 0.91
+    },
+    {
+      "baseline_prediction": 1,
+      "example_id": "fx-002",
+      "label": 1,
+      "prediction": 1,
+      "score": 0.83
+    },
+    {
+      "baseline_prediction": 1,
+      "example_id": "fx-003",
+      "label": 1,
+      "prediction": 1,
+      "score": 0.71
+    },
+    {
+      "baseline_prediction": 1,
+      "example_id": "fx-004",
+      "label": 0,
+      "prediction": 0,
+      "score": 0.42
+    },
+    {
+      "baseline_prediction": 1,
+      "example_id": "fx-005",
+      "label": 0,
+      "prediction": 0,
+      "score": 0.24
+    },
+    {
+      "baseline_prediction": 1,
+      "example_id": "fx-006",
+      "label": 0,
+      "prediction": 1,
+      "score": 0.56
+    }
+  ],
+  "live_model_calls": false,
+  "metrics": {
+    "accuracy": 0.833333,
+    "accuracy_delta": 0.333333,
+    "baseline_accuracy": 0.5
+  },
+  "model_id": "fixture-threshold-classifier",
+  "row_count": 6,
+  "schema_version": "aira.fixture_benchmark.v1"
+}

@@ -1,0 +1,19 @@
+{
+  "claims": [
+    {
+      "claim": "The deterministic AIRA fixture threshold model achieved accuracy 0.833333 and reproduced the expected local benchmark result.",
+      "claim_id": "aira-fixture-c1",
+      "limitations": [
+        "The dataset is synthetic and only validates the AIRA experiment bundle contract.",
+        "No live model, GPU training, or external dataset download is performed."
+      ],
+      "reproduction_status": "reproduced",
+      "status": "confirmed",
+      "supported_by": [
+        "reproduction_status",
+        "metrics_table",
+        "benchmark_report"
+      ]
+    }
+  ]
+}
