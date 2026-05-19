@@ -27,7 +27,8 @@ LOCAL_BENCHMARK_ID = "local-text-outcome-classification"
 LOCAL_DATASET_ID = "local-experiment-outcomes-v1"
 LOCAL_MODEL_ID = "deterministic-keyword-outcome-classifier-v1"
 LOCAL_BASELINE_ID = "deterministic-pass-prior-baseline-v1"
-LOCAL_TASK_ID = "AIRA-BENCHMARK-001"
+LOCAL_ABLATION_MODEL_ID = "deterministic-keyword-no-negative-ablation-v1"
+LOCAL_TASK_ID = "AIRA-REAL-BENCH-001"
 LOCAL_COMMAND = "python3 -m aira run-local-benchmark"
 ARA_HANDOFF_SCHEMA_VERSION = "aira.ara_handoff.v1"
 ARA_GATE_PROFILE = "ara-public-bundle-reproduction-gate.v1"
@@ -36,42 +37,86 @@ ARA_VALIDATE_COMMAND = "python3 -m aira bundles validate <bundle> --json"
 LOCAL_DATASET_ROWS: list[dict[str, str]] = [
     {
         "example_id": "local-001",
+        "split": "core",
+        "scenario": "bundle_validation",
         "text": "clear validation passed for the model bundle",
         "label": "pass",
     },
     {
         "example_id": "local-002",
+        "split": "core",
+        "scenario": "metrics_regression",
         "text": "benchmark metrics improved after the deterministic fix",
         "label": "pass",
     },
     {
         "example_id": "local-003",
+        "split": "core",
+        "scenario": "reproduction",
         "text": "reproduction status confirmed without network access",
         "label": "pass",
     },
     {
         "example_id": "local-004",
+        "split": "core",
+        "scenario": "registry",
         "text": "registry snapshot matched the expected schema",
         "label": "pass",
     },
     {
         "example_id": "local-005",
+        "split": "core",
+        "scenario": "provenance",
         "text": "missing provenance blocked the experiment handoff",
         "label": "fail",
     },
     {
         "example_id": "local-006",
+        "split": "core",
+        "scenario": "model_regression",
         "text": "model output regressed on the held out case",
         "label": "fail",
     },
     {
         "example_id": "local-007",
+        "split": "core",
+        "scenario": "environment",
         "text": "flaky setup failed before metrics were written",
         "label": "fail",
     },
     {
         "example_id": "local-008",
+        "split": "core",
+        "scenario": "dataset_metadata",
         "text": "stale dataset metadata caused validation errors",
+        "label": "fail",
+    },
+    {
+        "example_id": "local-009",
+        "split": "handoff",
+        "scenario": "agent_trace",
+        "text": "agent trace confirmed the expected registry handoff",
+        "label": "pass",
+    },
+    {
+        "example_id": "local-010",
+        "split": "handoff",
+        "scenario": "provenance_repair",
+        "text": "bundle validation passed after provenance repair",
+        "label": "pass",
+    },
+    {
+        "example_id": "local-011",
+        "split": "handoff",
+        "scenario": "agent_memory",
+        "text": "agent memory notes missing after the run",
+        "label": "fail",
+    },
+    {
+        "example_id": "local-012",
+        "split": "handoff",
+        "scenario": "audit_artifact",
+        "text": "metrics table failed during audit",
         "label": "fail",
     },
 ]
@@ -180,14 +225,39 @@ def _tokenize(text: str) -> list[str]:
 
 def keyword_outcome_predict(text: str) -> str:
     """Predict pass/fail outcome using a deterministic lexical model."""
+    return _predict_with_terms(
+        text,
+        positive_terms=LOCAL_MODEL_CONFIG["positive_terms"],
+        negative_terms=LOCAL_MODEL_CONFIG["negative_terms"],
+        tie_break_label=str(LOCAL_MODEL_CONFIG["tie_break_label"]),
+    )
+
+
+def keyword_no_negative_predict(text: str) -> str:
+    """A deterministic ablation that disables all negative outcome terms."""
+    return _predict_with_terms(
+        text,
+        positive_terms=LOCAL_MODEL_CONFIG["positive_terms"],
+        negative_terms=[],
+        tie_break_label=str(LOCAL_MODEL_CONFIG["tie_break_label"]),
+    )
+
+
+def _predict_with_terms(
+    text: str,
+    *,
+    positive_terms: list[str],
+    negative_terms: list[str],
+    tie_break_label: str,
+) -> str:
     tokens = set(_tokenize(text))
-    positive_hits = sum(1 for term in LOCAL_MODEL_CONFIG["positive_terms"] if term in tokens)
-    negative_hits = sum(1 for term in LOCAL_MODEL_CONFIG["negative_terms"] if term in tokens)
+    positive_hits = sum(1 for term in positive_terms if term in tokens)
+    negative_hits = sum(1 for term in negative_terms if term in tokens)
     if positive_hits > negative_hits:
         return "pass"
     if negative_hits > positive_hits:
         return "fail"
-    return str(LOCAL_MODEL_CONFIG["tie_break_label"])
+    return tie_break_label
 
 
 def pass_prior_predict(_: str) -> str:
@@ -250,9 +320,9 @@ def build_local_provenance() -> dict[str, Any]:
             "live_model_calls": False,
         },
         "limitations": [
-            "The dataset is a tiny local text fixture for runner and bundle integration.",
+            "The dataset is a small built-in local text fixture for runner and bundle integration.",
             "The lexical classifier is deterministic and does not represent a trained frontier model.",
-            "The run ledger is bundle-local; shared experiment memory is reserved for the agent MVP.",
+            "The run ledger and experiment memory are bundle-local deterministic artifacts.",
         ],
     }
 
@@ -284,6 +354,10 @@ def build_ara_handoff(report: dict[str, Any], provenance: dict[str, Any]) -> dic
             "run_ledger_entry": "artifacts/run_ledger_entry.json",
             "run_ledger": "memory/run_ledger.jsonl",
             "benchmark_report": "artifacts/benchmark_report.json",
+            "ablation_report": "artifacts/ablation_report.json",
+            "error_analysis": "artifacts/error_analysis.json",
+            "experiment_memory": "memory/experiment_memory.json",
+            "experiment_memory_log": "memory/experiment_memory.jsonl",
         },
         "reproducibility": {
             "deterministic": True,
@@ -359,6 +433,148 @@ def evaluate_local_benchmark() -> dict[str, Any]:
     }
 
 
+def evaluate_local_ablations(report: dict[str, Any] | None = None) -> dict[str, Any]:
+    base_report = report or evaluate_local_benchmark()
+    labels = [row["label"] for row in LOCAL_DATASET_ROWS]
+    ablation_predictions = [keyword_no_negative_predict(row["text"]) for row in LOCAL_DATASET_ROWS]
+    ablation_metrics = _classification_metrics(ablation_predictions, labels)
+    errors = [
+        {
+            "example_id": row["example_id"],
+            "split": row["split"],
+            "scenario": row["scenario"],
+            "label": row["label"],
+            "prediction": ablation_predictions[index],
+            "error_type": "false_pass_without_negative_terms",
+        }
+        for index, row in enumerate(LOCAL_DATASET_ROWS)
+        if ablation_predictions[index] != row["label"]
+    ]
+    return {
+        "schema_version": "aira.local_benchmark_ablation.v1",
+        "run_id": base_report["run_id"],
+        "benchmark_id": LOCAL_BENCHMARK_ID,
+        "dataset_id": LOCAL_DATASET_ID,
+        "primary_model_id": LOCAL_MODEL_ID,
+        "ablations": [
+            {
+                "ablation_id": "remove-negative-outcome-terms",
+                "model_id": LOCAL_ABLATION_MODEL_ID,
+                "description": "Disable deterministic negative outcome terms while keeping the pass tie-break rule.",
+                "disabled_features": ["negative_terms"],
+                "metrics": {
+                    "accuracy": ablation_metrics["accuracy"],
+                    "macro_f1": ablation_metrics["macro_f1"],
+                    "accuracy_delta_vs_primary": round(
+                        ablation_metrics["accuracy"] - base_report["metrics"]["accuracy"], 6
+                    ),
+                    "error_count": len(errors),
+                },
+                "per_class": ablation_metrics["per_class"],
+                "errors": errors,
+            }
+        ],
+        "deterministic": True,
+        "network_required": False,
+        "external_datasets_required": False,
+        "gpu_required": False,
+        "live_model_calls": False,
+    }
+
+
+def build_local_error_analysis(
+    report: dict[str, Any],
+    ablation_report: dict[str, Any],
+) -> dict[str, Any]:
+    primary_errors = [
+        {
+            "example_id": example["example_id"],
+            "split": example["split"],
+            "scenario": example["scenario"],
+            "label": example["label"],
+            "prediction": example["prediction"],
+            "margin": example["margin"],
+        }
+        for example in report["examples"]
+        if example["prediction"] != example["label"]
+    ]
+    ablation_failures = ablation_report["ablations"][0]["errors"]
+    return {
+        "schema_version": "aira.local_benchmark_error_analysis.v1",
+        "run_id": report["run_id"],
+        "benchmark_id": LOCAL_BENCHMARK_ID,
+        "primary_model_id": LOCAL_MODEL_ID,
+        "primary_error_count": len(primary_errors),
+        "primary_errors": primary_errors,
+        "ablation_error_count": len(ablation_failures),
+        "ablation_error_summary": {
+            "ablation_id": ablation_report["ablations"][0]["ablation_id"],
+            "dominant_error_type": "false_pass_without_negative_terms",
+            "affected_splits": sorted({error["split"] for error in ablation_failures}),
+            "affected_scenarios": sorted({error["scenario"] for error in ablation_failures}),
+        },
+        "findings": [
+            "The primary deterministic keyword model has no errors on the bundled local fixture.",
+            "Removing negative outcome terms collapses fail examples into pass predictions.",
+            "The benchmark therefore records negative-term coverage as a reusable experiment memory constraint.",
+        ],
+        "deterministic": True,
+    }
+
+
+def build_local_experiment_memory(
+    report: dict[str, Any],
+    provenance: dict[str, Any],
+    ablation_report: dict[str, Any],
+    error_analysis: dict[str, Any],
+) -> dict[str, Any]:
+    ablation = ablation_report["ablations"][0]
+    return {
+        "schema_version": "aira.experiment_memory.v1",
+        "run_id": report["run_id"],
+        "task_id": LOCAL_TASK_ID,
+        "created_at": LOCAL_CREATED_AT,
+        "retrieval_keys": [
+            LOCAL_BENCHMARK_ID,
+            LOCAL_DATASET_ID,
+            LOCAL_MODEL_ID,
+            "offline-deterministic",
+            "negative-term-ablation",
+            "ara-public-bundle-reproduction-gate.v1",
+        ],
+        "selected_registry_entries": {
+            "benchmark_id": LOCAL_BENCHMARK_ID,
+            "dataset_id": LOCAL_DATASET_ID,
+            "model_ids": [LOCAL_MODEL_ID, LOCAL_BASELINE_ID, LOCAL_ABLATION_MODEL_ID],
+        },
+        "metrics": report["metrics"],
+        "input_fingerprints": provenance["input_fingerprints"],
+        "ablation_findings": [
+            {
+                "ablation_id": ablation["ablation_id"],
+                "model_id": ablation["model_id"],
+                "accuracy_delta_vs_primary": ablation["metrics"]["accuracy_delta_vs_primary"],
+                "error_count": ablation["metrics"]["error_count"],
+            }
+        ],
+        "error_analysis": {
+            "primary_error_count": error_analysis["primary_error_count"],
+            "ablation_error_count": error_analysis["ablation_error_count"],
+            "dominant_ablation_error_type": error_analysis["ablation_error_summary"]["dominant_error_type"],
+        },
+        "reusable_notes": [
+            "Keep negative outcome terms enabled for local pass/fail outcome classification.",
+            "Use the handoff split examples to catch agent-memory and audit artifact regressions.",
+            "Treat this memory as bundle-local and deterministic; it has no external service dependency.",
+        ],
+        "deterministic": True,
+        "network_required": False,
+        "external_datasets_required": False,
+        "gpu_required": False,
+        "live_model_calls": False,
+    }
+
+
 def evaluate_fixture_benchmark() -> dict[str, Any]:
     labels = [int(row["label"]) for row in FIXTURE_ROWS]
     threshold_predictions = [threshold_predict(float(row["score"])) for row in FIXTURE_ROWS]
@@ -410,7 +626,7 @@ def _write_dataset_table(path: Path) -> None:
 def _write_local_dataset_table(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["example_id", "text", "label"])
+        writer = csv.DictWriter(handle, fieldnames=["example_id", "split", "scenario", "text", "label"])
         writer.writeheader()
         writer.writerows(LOCAL_DATASET_ROWS)
 
@@ -422,6 +638,8 @@ def _write_local_predictions_table(path: Path, examples: list[dict[str, Any]]) -
             handle,
             fieldnames=[
                 "example_id",
+                "split",
+                "scenario",
                 "label",
                 "prediction",
                 "baseline_prediction",
@@ -470,9 +688,12 @@ def _build_local_run_ledger_entry(
         },
         "artifacts": [
             "artifacts/benchmark_report.json",
+            "artifacts/ablation_report.json",
+            "artifacts/error_analysis.json",
             "artifacts/provenance.json",
             "artifacts/reproduction_status.json",
             "memory/run_ledger.jsonl",
+            "memory/experiment_memory.jsonl",
         ],
     }
 
@@ -492,6 +713,7 @@ def _write_local_reproducibility_notes(path: Path, report: dict[str, Any], prove
                 f"- Model config sha256: `{provenance['input_fingerprints']['model_config_sha256']}`.",
                 f"- Registry snapshot sha256: `{provenance['input_fingerprints']['registry_snapshot_sha256']}`.",
                 "- The benchmark is deterministic and uses only built-in local fixture data.",
+                "- The bundle includes deterministic ablation, error-analysis, and experiment-memory artifacts.",
                 "- No network dataset, live model API, GPU, training job, or external service is required.",
                 "",
             ]
@@ -636,7 +858,10 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
     memory_dir.mkdir(parents=True, exist_ok=True)
 
     report = evaluate_local_benchmark()
+    ablation_report = evaluate_local_ablations(report)
+    error_analysis = build_local_error_analysis(report, ablation_report)
     provenance = build_local_provenance()
+    experiment_memory = build_local_experiment_memory(report, provenance, ablation_report, error_analysis)
     ara_handoff = build_ara_handoff(report, provenance)
     write_json(
         out / "bundle_manifest.json",
@@ -665,6 +890,8 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
         },
     )
     write_json(out / "artifacts" / "benchmark_report.json", report)
+    write_json(out / "artifacts" / "ablation_report.json", ablation_report)
+    write_json(out / "artifacts" / "error_analysis.json", error_analysis)
     write_json(out / "artifacts" / "provenance.json", provenance)
     write_json(out / "artifacts" / "ara_handoff.json", ara_handoff)
     _write_local_reproducibility_notes(out / "artifacts" / "reproducibility_notes.md", report, provenance)
@@ -701,6 +928,18 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
                     "path": "artifacts/benchmark_report.json",
                     "kind": "benchmark_report",
                     "description": "Deterministic local text outcome benchmark report.",
+                },
+                {
+                    "artifact_id": "ablation_report",
+                    "path": "artifacts/ablation_report.json",
+                    "kind": "ablation_report",
+                    "description": "Deterministic local ablation report over keyword outcome features.",
+                },
+                {
+                    "artifact_id": "error_analysis",
+                    "path": "artifacts/error_analysis.json",
+                    "kind": "error_analysis",
+                    "description": "Primary and ablation error analysis for local benchmark examples.",
                 },
                 {
                     "artifact_id": "provenance",
@@ -762,6 +1001,18 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
                     "kind": "run_ledger",
                     "description": "Bundle-local appendable run ledger for later experiment agents.",
                 },
+                {
+                    "artifact_id": "experiment_memory",
+                    "path": "memory/experiment_memory.json",
+                    "kind": "experiment_memory",
+                    "description": "Reusable deterministic experiment memory for later local agent runs.",
+                },
+                {
+                    "artifact_id": "experiment_memory_log",
+                    "path": "memory/experiment_memory.jsonl",
+                    "kind": "experiment_memory",
+                    "description": "JSONL form of reusable deterministic experiment memory.",
+                },
             ]
         },
     )
@@ -782,10 +1033,13 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
                         "reproduction_status",
                         "metrics_table",
                         "benchmark_report",
+                        "ablation_report",
+                        "error_analysis",
                         "provenance",
                         "ara_handoff",
                         "reproducibility_notes",
                         "run_ledger_entry",
+                        "experiment_memory",
                     ],
                     "limitations": provenance["limitations"],
                 }
@@ -810,10 +1064,10 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
             [
                 "# Limitations",
                 "",
-                "- Tiny built-in local dataset with eight examples.",
-                "- Deterministic lexical classifier and pass-prior baseline only.",
+                "- Small built-in local dataset with twelve examples.",
+                "- Deterministic lexical classifier, pass-prior baseline, and local feature ablation only.",
                 "- No training, GPU execution, live model API, external dataset, or network access.",
-                "- Ledger persistence is bundle-local until the AIRA experiment agent memory service exists.",
+                "- Ledger and experiment memory persistence remain bundle-local deterministic artifacts.",
                 "",
             ]
         ),
@@ -827,8 +1081,13 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
         validation_valid=True,
     )
     write_json(out / "artifacts" / "run_ledger_entry.json", ledger_entry)
+    write_json(out / "memory" / "experiment_memory.json", experiment_memory)
     (out / "memory" / "run_ledger.jsonl").write_text(
         json.dumps(ledger_entry, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    (out / "memory" / "experiment_memory.jsonl").write_text(
+        json.dumps(experiment_memory, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     validation = validate_bundle(out)
@@ -856,10 +1115,21 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
             "dataset_sha256": provenance["input_fingerprints"]["dataset_sha256"],
             "model_config_sha256": provenance["input_fingerprints"]["model_config_sha256"],
         },
+        "analysis": {
+            "ablation_report_path": str(out / "artifacts" / "ablation_report.json"),
+            "error_analysis_path": str(out / "artifacts" / "error_analysis.json"),
+            "primary_error_count": error_analysis["primary_error_count"],
+            "ablation_error_count": error_analysis["ablation_error_count"],
+        },
         "run_ledger": {
             "entry_path": str(out / "artifacts" / "run_ledger_entry.json"),
             "ledger_path": str(out / "memory" / "run_ledger.jsonl"),
             "entry": ledger_entry,
+        },
+        "experiment_memory": {
+            "path": str(out / "memory" / "experiment_memory.json"),
+            "log_path": str(out / "memory" / "experiment_memory.jsonl"),
+            "entry": experiment_memory,
         },
         "validation": validation.to_dict(),
     }

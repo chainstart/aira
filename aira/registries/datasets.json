@@ -12,14 +12,18 @@
     {
       "external_datasets_required": false,
       "id": "local-experiment-outcomes-v1",
-      "intended_use": "Exercise local benchmark execution, provenance, and run ledger persistence.",
+      "intended_use": "Exercise local benchmark execution, provenance, ablation analysis, and run memory.",
       "label_set": [
         "fail",
         "pass"
       ],
       "name": "Local experiment outcome text classification set",
       "network_required": false,
-      "rows": 8,
+      "rows": 12,
+      "splits": [
+        "core",
+        "handoff"
+      ],
       "source": "builtin_local_fixture",
       "status": "local_deterministic"
     }

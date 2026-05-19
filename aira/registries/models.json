@@ -35,6 +35,16 @@
       "name": "Deterministic pass-prior baseline",
       "network_required": false,
       "status": "local_deterministic"
+    },
+    {
+      "gpu_required": false,
+      "id": "deterministic-keyword-no-negative-ablation-v1",
+      "implementation": "aira.benchmark.keyword_no_negative_predict",
+      "intended_use": "Local ablation fixture proving negative outcome terms are required for fail examples.",
+      "live_model_calls": false,
+      "name": "Deterministic keyword classifier without negative terms",
+      "network_required": false,
+      "status": "local_deterministic_ablation"
     }
   ],
   "schema_version": "aira.model_registry.v1"

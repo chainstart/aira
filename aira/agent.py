@@ -228,7 +228,7 @@ def _update_ara_handoff(bundle_path: Path, plan: dict[str, Any], run_id: str) ->
                     f"- Agent task id: `{AGENT_TASK_ID}`.",
                     f"- Reproduce the agent smoke with `{AGENT_COMMAND} --out <bundle>`.",
                     "- The agent loop only selects the registered deterministic local benchmark.",
-                    "- The emitted bundle includes agent plan, trace, observation, reflection, and memory artifacts.",
+                    "- The emitted bundle includes agent plan, trace, observation, reflection, ablation, error-analysis, and memory artifacts.",
                     "",
                 ]
             ),
@@ -257,6 +257,7 @@ def run_agent_smoke(output_dir: str | Path) -> dict[str, Any]:
         "validation_error_count": len(initial_validation.errors),
         "artifact_ids": sorted(artifact_ids),
         "metrics": benchmark_payload["benchmark"]["metrics"],
+        "analysis": benchmark_payload["analysis"],
         "run_id": benchmark_payload["run_id"],
     }
     reflection = {
@@ -267,12 +268,14 @@ def run_agent_smoke(output_dir: str | Path) -> dict[str, Any]:
         "outcome": "accepted" if initial_validation.valid else "rejected",
         "reusable_memory": [
             "Use local-text-outcome-classification for offline smoke checks.",
+            "Preserve negative outcome terms; the deterministic ablation records fail-example collapse without them.",
+            "Carry experiment_memory artifacts forward when comparing local agent runs.",
             "Require bundle validation before promoting any agent-produced result.",
             "Keep live_model_calls, network_required, external_datasets_required, and gpu_required false.",
         ],
         "next_actions": [
             "Add more deterministic local runners before enabling agent choice among experiment families.",
-            "Promote bundle-local memory to a shared local memory index when cross-run retrieval is needed.",
+            "Promote bundle-local experiment memory to a shared local memory index when cross-run retrieval is needed.",
         ],
     }
     memory_entry = {
@@ -284,6 +287,12 @@ def run_agent_smoke(output_dir: str | Path) -> dict[str, Any]:
         "bundle_path": str(out),
         "selected_registry_entries": plan["selected_registry_entries"],
         "metrics": benchmark_payload["benchmark"]["metrics"],
+        "analysis": benchmark_payload["analysis"],
+        "experiment_memory": {
+            "path": benchmark_payload["experiment_memory"]["path"],
+            "retrieval_keys": benchmark_payload["experiment_memory"]["entry"]["retrieval_keys"],
+            "ablation_findings": benchmark_payload["experiment_memory"]["entry"]["ablation_findings"],
+        },
         "bundle_valid": initial_validation.valid,
         "outcome": reflection["outcome"],
         "reusable_notes": reflection["reusable_memory"],

@@ -257,12 +257,12 @@ milestones:
       timeout_seconds: 120
 - id: aira-real-benchmark-extension
   title: AIRA Real Benchmark Extension
-  status: active
+  status: completed
   objective: Complete the ARA ecosystem AIRA-REAL-BENCH-001 direction by extending AIRA beyond fixture smoke toward richer deterministic local benchmark, ablation, error-analysis, and experiment-memory behavior without live model or network dependencies.
   tasks:
   - id: AIRA-REAL-BENCH-001
     title: Build AIRA real benchmark and experiment agent beyond fixture smoke
-    status: pending
+    status: completed
     max_attempts: 2
     max_task_iterations: 3
     manual_approval_required: false

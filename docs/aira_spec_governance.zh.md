@@ -15,8 +15,8 @@ AIRA 是 ARA 生态中的 AI/ML 领域实验室。它负责 AI 研究所需的�
 - `python3 -m aira bundles validate <bundle> --json`：验证 `aira_result_bundle`。
 - `python3 -m aira migrate inventory --source <ara-repo> --json`：盘点从 ARA 迁出的 AI 实验职责。
 - `python3 -m aira run-fixture-benchmark --out <dir> --json`：生成确定性 fixture benchmark bundle。
-- `python3 -m aira run-local-benchmark --out <dir> --json`：运行本地确定性文本分类 benchmark，生成含 provenance 与 run ledger 的 `aira_result_bundle`。
-- `python3 -m aira agent smoke --out <dir> --json`：生成 ARA handoff-ready 的确定性 agent bundle，包含 `artifacts/ara_handoff.json`、`artifacts/reproducibility_notes.md`、claims、provenance 和 bundle-local run ledger。
+- `python3 -m aira run-local-benchmark --out <dir> --json`：运行本地确定性文本分类 benchmark，生成含 provenance、ablation report、error analysis、run ledger 与 experiment memory 的 `aira_result_bundle`。
+- `python3 -m aira agent smoke --out <dir> --json`：生成 ARA handoff-ready 的确定性 agent bundle，包含 `artifacts/ara_handoff.json`、`artifacts/reproducibility_notes.md`、claims、provenance、ablation/error-analysis artifacts 和 bundle-local memory。
 
 ## 3. Requirement ID
 

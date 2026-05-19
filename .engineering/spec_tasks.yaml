@@ -1,7 +1,7 @@
 {
   "kind": "aira.spec_tasks.v1",
   "project": "aira",
-  "updated_at": "2026-05-19T14:01:46Z",
+  "updated_at": "2026-05-19T14:29:55Z",
   "source_spec": "docs/aira_spec_governance.zh.md",
   "status_doc": "docs/aira_implementation_status.zh.md",
   "decision_log_dir": "docs/decisions",
@@ -278,6 +278,75 @@
       ],
       "next_action": "Keep the ARA handoff profile synchronized with public ARA bundle and reproduction gate contract changes.",
       "updated_at": "2026-05-19T14:01:46Z",
+      "last_note": "Recorded automatically after a completed harness task.",
+      "last_phase": "drive"
+    },
+    {
+      "id": "AIRA-REAL-BENCH-001",
+      "title": "Build AIRA real benchmark and experiment agent beyond fixture smoke",
+      "status": "completed",
+      "requirement_ids": [
+        "REQ-AIRA-REGISTRY-001",
+        "REQ-AIRA-BENCHMARK-001",
+        "REQ-AIRA-AGENT-001",
+        "REQ-AIRA-MEMORY-001",
+        "REQ-AIRA-ARA-001"
+      ],
+      "evidence": [
+        {
+          "kind": "command",
+          "value": "python3 -m aira run-local-benchmark --out /tmp/aira_real_benchmark_bundle --json"
+        },
+        {
+          "kind": "command",
+          "value": "python3 -m aira agent smoke --out /tmp/aira_real_agent_bundle --json"
+        },
+        {
+          "kind": "test",
+          "value": "python3 -m pytest -q"
+        },
+        {
+          "kind": "artifact",
+          "path": "artifacts/ablation_report.json"
+        },
+        {
+          "kind": "artifact",
+          "path": "artifacts/error_analysis.json"
+        },
+        {
+          "kind": "artifact",
+          "path": "memory/experiment_memory.json"
+        },
+        {
+          "kind": "artifact",
+          "path": "docs/aira_implementation_status.zh.md"
+        },
+        {
+          "kind": "record",
+          "value": "task report: .engineering/reports/tasks/20260519T142119Z-AIRA-REAL-BENCH-001.md",
+          "recorded_at": "2026-05-19T14:29:55Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task manifest: .engineering/reports/tasks/20260519T142119Z-AIRA-REAL-BENCH-001.json",
+          "recorded_at": "2026-05-19T14:29:55Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task result: All required acceptance commands passed.",
+          "recorded_at": "2026-05-19T14:29:55Z",
+          "actor": "engineering-harness:auto"
+        }
+      ],
+      "remaining_limits": [
+        "The richer benchmark remains a deterministic built-in local text fixture, not an external dataset benchmark.",
+        "No live model APIs, GPU execution, network datasets, external accounts, or external model weights are enabled.",
+        "Experiment memory is reusable inside emitted bundles; cross-run shared indexing remains future work."
+      ],
+      "next_action": "Add additional deterministic local experiment families before enabling broader agent runner selection.",
+      "updated_at": "2026-05-19T14:29:55Z",
       "last_note": "Recorded automatically after a completed harness task.",
       "last_phase": "drive"
     }

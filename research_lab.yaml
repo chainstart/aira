@@ -59,8 +59,12 @@ bundles:
         - artifacts/reproducibility_notes.md
         - artifacts/reproduction_status.json
         - artifacts/provenance.json
+        - artifacts/ablation_report.json
+        - artifacts/error_analysis.json
         - artifacts/run_ledger_entry.json
         - memory/run_ledger.jsonl
+        - memory/experiment_memory.json
+        - memory/experiment_memory.jsonl
 registries:
   datasets: aira/registries/datasets.json
   models: aira/registries/models.json

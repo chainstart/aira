@@ -21,11 +21,12 @@ DATASETS: list[dict[str, Any]] = [
         "name": "Local experiment outcome text classification set",
         "status": "local_deterministic",
         "source": "builtin_local_fixture",
-        "rows": 8,
+        "rows": 12,
         "label_set": ["fail", "pass"],
+        "splits": ["core", "handoff"],
         "network_required": False,
         "external_datasets_required": False,
-        "intended_use": "Exercise local benchmark execution, provenance, and run ledger persistence.",
+        "intended_use": "Exercise local benchmark execution, provenance, ablation analysis, and run memory.",
     },
 ]
 
@@ -66,6 +67,16 @@ MODELS: list[dict[str, Any]] = [
         "gpu_required": False,
         "intended_use": "Deterministic baseline for the local text outcome benchmark.",
     },
+    {
+        "id": "deterministic-keyword-no-negative-ablation-v1",
+        "name": "Deterministic keyword classifier without negative terms",
+        "status": "local_deterministic_ablation",
+        "implementation": "aira.benchmark.keyword_no_negative_predict",
+        "live_model_calls": False,
+        "network_required": False,
+        "gpu_required": False,
+        "intended_use": "Local ablation fixture proving negative outcome terms are required for fail examples.",
+    },
 ]
 
 BENCHMARKS: list[dict[str, Any]] = [
@@ -87,14 +98,22 @@ BENCHMARKS: list[dict[str, Any]] = [
         "model_ids": [
             "deterministic-keyword-outcome-classifier-v1",
             "deterministic-pass-prior-baseline-v1",
+            "deterministic-keyword-no-negative-ablation-v1",
         ],
-        "metric_ids": ["accuracy", "macro_f1", "baseline_accuracy", "accuracy_delta"],
+        "metric_ids": ["accuracy", "macro_f1", "baseline_accuracy", "accuracy_delta", "ablation_error_count"],
         "network_required": False,
         "external_datasets_required": False,
         "gpu_required": False,
         "live_model_calls": False,
         "emits_bundle_type": "aira_result_bundle",
-        "emits_artifact_kinds": ["benchmark_report", "provenance", "run_ledger"],
+        "emits_artifact_kinds": [
+            "benchmark_report",
+            "ablation_report",
+            "error_analysis",
+            "provenance",
+            "run_ledger",
+            "experiment_memory",
+        ],
         "entrypoint": "python3 -m aira run-local-benchmark",
     },
 ]

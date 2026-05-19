@@ -3,10 +3,14 @@ import json
 from aira import cli
 from aira.agent import build_agent_plan, run_agent_smoke, select_local_experiment
 from aira.benchmark import (
+    LOCAL_ABLATION_MODEL_ID,
     LOCAL_BENCHMARK_ID,
     LOCAL_DATASET_ID,
     LOCAL_MODEL_ID,
+    build_local_error_analysis,
+    build_local_experiment_memory,
     build_local_provenance,
+    evaluate_local_ablations,
     evaluate_local_benchmark,
     write_local_benchmark_bundle,
 )
@@ -21,7 +25,8 @@ def test_local_benchmark_metrics_are_deterministic():
     assert payload["benchmark_id"] == LOCAL_BENCHMARK_ID
     assert payload["dataset_id"] == LOCAL_DATASET_ID
     assert payload["model_id"] == LOCAL_MODEL_ID
-    assert payload["row_count"] == 8
+    assert payload["row_count"] == 12
+    assert {example["split"] for example in payload["examples"]} == {"core", "handoff"}
     assert payload["metrics"] == {
         "accuracy": 1.0,
         "macro_f1": 1.0,
@@ -34,6 +39,28 @@ def test_local_benchmark_metrics_are_deterministic():
     assert payload["external_datasets_required"] is False
     assert payload["gpu_required"] is False
     assert payload["live_model_calls"] is False
+
+
+def test_local_benchmark_ablation_and_error_analysis_are_deterministic():
+    report = evaluate_local_benchmark()
+    provenance = build_local_provenance()
+    ablation = evaluate_local_ablations(report)
+    error_analysis = build_local_error_analysis(report, ablation)
+    memory = build_local_experiment_memory(report, provenance, ablation, error_analysis)
+
+    assert ablation["schema_version"] == "aira.local_benchmark_ablation.v1"
+    assert ablation["ablations"][0]["model_id"] == LOCAL_ABLATION_MODEL_ID
+    assert ablation["ablations"][0]["metrics"] == {
+        "accuracy": 0.5,
+        "macro_f1": 0.333333,
+        "accuracy_delta_vs_primary": -0.5,
+        "error_count": 6,
+    }
+    assert error_analysis["schema_version"] == "aira.local_benchmark_error_analysis.v1"
+    assert error_analysis["primary_error_count"] == 0
+    assert error_analysis["ablation_error_count"] == 6
+    assert "negative-term-ablation" in memory["retrieval_keys"]
+    assert memory["ablation_findings"][0]["error_count"] == 6
 
 
 def test_local_benchmark_provenance_is_reproducible():
@@ -77,12 +104,22 @@ def test_write_local_benchmark_bundle_persists_provenance_and_run_ledger(tmp_pat
     ara_handoff = json.loads((output / "artifacts" / "ara_handoff.json").read_text(encoding="utf-8"))
     ledger_entry = json.loads((output / "artifacts" / "run_ledger_entry.json").read_text(encoding="utf-8"))
     ledger_lines = (output / "memory" / "run_ledger.jsonl").read_text(encoding="utf-8").splitlines()
+    ablation_report = json.loads((output / "artifacts" / "ablation_report.json").read_text(encoding="utf-8"))
+    error_analysis = json.loads((output / "artifacts" / "error_analysis.json").read_text(encoding="utf-8"))
+    experiment_memory = json.loads((output / "memory" / "experiment_memory.json").read_text(encoding="utf-8"))
+    experiment_memory_lines = (output / "memory" / "experiment_memory.jsonl").read_text(encoding="utf-8").splitlines()
 
     assert provenance["run_id"] == payload["run_id"]
     assert ara_handoff["consumer"] == "ara"
     assert ara_handoff["reproducibility"]["network_required"] is False
     assert ara_handoff["required_gate_inputs"]["run_ledger"] == "memory/run_ledger.jsonl"
+    assert ara_handoff["required_gate_inputs"]["ablation_report"] == "artifacts/ablation_report.json"
+    assert ara_handoff["required_gate_inputs"]["experiment_memory"] == "memory/experiment_memory.json"
     assert (output / "artifacts" / "reproducibility_notes.md").read_text(encoding="utf-8").strip()
+    assert ablation_report["ablations"][0]["metrics"]["error_count"] == 6
+    assert error_analysis["primary_error_count"] == 0
+    assert experiment_memory["run_id"] == payload["run_id"]
+    assert json.loads(experiment_memory_lines[0]) == experiment_memory
     assert ledger_entry["run_id"] == payload["run_id"]
     assert ledger_entry["status"] == "passed"
     assert ledger_entry["reproducibility"]["live_model_calls"] is False
@@ -97,7 +134,7 @@ def test_local_benchmark_bundle_validates(tmp_path):
     result = validate_bundle(output)
 
     assert result.valid
-    assert result.metadata["artifact_count"] == 11
+    assert result.metadata["artifact_count"] == 15
     assert result.metadata["claim_count"] == 1
     assert result.metadata["ara_gate"]["required_inputs_present"] is True
 
@@ -111,7 +148,9 @@ def test_local_benchmark_cli_emits_json(tmp_path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "passed"
     assert payload["benchmark"]["metrics"]["accuracy_delta"] == 0.5
+    assert payload["analysis"]["ablation_error_count"] == 6
     assert payload["run_ledger"]["entry"]["status"] == "passed"
+    assert payload["experiment_memory"]["entry"]["ablation_findings"][0]["error_count"] == 6
 
 
 def test_local_benchmark_is_registered():
@@ -124,11 +163,15 @@ def test_local_benchmark_is_registered():
     assert LOCAL_DATASET_ID in dataset_ids
     assert LOCAL_MODEL_ID in model_ids
     assert "deterministic-pass-prior-baseline-v1" in model_ids
+    assert LOCAL_ABLATION_MODEL_ID in model_ids
     assert benchmarks[LOCAL_BENCHMARK_ID]["entrypoint"] == "python3 -m aira run-local-benchmark"
     assert benchmarks[LOCAL_BENCHMARK_ID]["emits_artifact_kinds"] == [
         "benchmark_report",
+        "ablation_report",
+        "error_analysis",
         "provenance",
         "run_ledger",
+        "experiment_memory",
     ]
 
 
@@ -146,6 +189,7 @@ def test_agent_selects_safe_registered_local_experiment(tmp_path):
         "model_ids": [
             LOCAL_MODEL_ID,
             "deterministic-pass-prior-baseline-v1",
+            LOCAL_ABLATION_MODEL_ID,
         ],
         "primary_model_id": LOCAL_MODEL_ID,
     }
@@ -167,6 +211,8 @@ def test_agent_smoke_emits_valid_bundle_with_reusable_memory(tmp_path):
     assert payload["memory"]["entry"]["outcome"] == "accepted"
     assert payload["memory"]["entry"]["bundle_valid"] is True
     assert payload["memory"]["entry"]["metrics"]["accuracy_delta"] == 0.5
+    assert payload["memory"]["entry"]["analysis"]["ablation_error_count"] == 6
+    assert "negative-term-ablation" in payload["memory"]["entry"]["experiment_memory"]["retrieval_keys"]
 
     agent_memory = json.loads((output / "memory" / "agent_memory.json").read_text(encoding="utf-8"))
     agent_memory_lines = (output / "memory" / "agent_memory.jsonl").read_text(encoding="utf-8").splitlines()
@@ -178,6 +224,7 @@ def test_agent_smoke_emits_valid_bundle_with_reusable_memory(tmp_path):
     assert agent_memory["entries"] == [payload["memory"]["entry"]]
     assert json.loads(agent_memory_lines[0]) == payload["memory"]["entry"]
     assert agent_trace["reflection"]["outcome"] == "accepted"
+    assert agent_trace["observation"]["analysis"]["primary_error_count"] == 0
     assert validation.metadata["ara_gate"]["profile"] == "ara-public-bundle-reproduction-gate.v1"
     assert "artifacts/reproducibility_notes.md" in validation.metadata["ara_gate"]["reproducibility_note_artifacts"]
     assert {claim["claim_id"] for claim in claims["claims"]} >= {
