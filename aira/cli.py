@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from aira import __version__
+from aira.agent import run_agent_smoke
 from aira.benchmark import write_fixture_bundle, write_local_benchmark_bundle
 from aira.bundles import validate_bundle
 from aira.manifest import DEFAULT_MANIFEST_PATH, load_manifest
@@ -58,6 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
     local_benchmark.add_argument("--out", required=True, help="Output bundle directory.")
     local_benchmark.add_argument("--json", action="store_true", help="Print JSON output.")
 
+    agent = subparsers.add_parser("agent", help="Run deterministic local experiment agent loops.")
+    agent_sub = agent.add_subparsers(dest="agent_command", required=True)
+    agent_smoke = agent_sub.add_parser("smoke", help="Run the deterministic local agent smoke.")
+    agent_smoke.add_argument("--out", required=True, help="Output bundle directory.")
+    agent_smoke.add_argument("--json", action="store_true", help="Print JSON output.")
+
     registries = subparsers.add_parser("registries", help="Print registry placeholders.")
     registries.add_argument("--json", action="store_true", help="Print JSON output.")
     return parser
@@ -94,6 +101,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "run-local-benchmark":
         payload = write_local_benchmark_bundle(Path(args.out))
+        _print_payload(payload, as_json=args.json)
+        return 0 if payload["status"] == "passed" else 1
+
+    if args.command == "agent" and args.agent_command == "smoke":
+        payload = run_agent_smoke(Path(args.out))
         _print_payload(payload, as_json=args.json)
         return 0 if payload["status"] == "passed" else 1
 

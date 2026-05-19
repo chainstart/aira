@@ -1,7 +1,7 @@
 {
   "kind": "aira.spec_tasks.v1",
   "project": "aira",
-  "updated_at": "2026-05-19T04:27:32Z",
+  "updated_at": "2026-05-19T13:22:31Z",
   "source_spec": "docs/aira_spec_governance.zh.md",
   "status_doc": "docs/aira_implementation_status.zh.md",
   "decision_log_dir": "docs/decisions",
@@ -34,7 +34,7 @@
     {
       "id": "REQ-AIRA-AGENT-001",
       "title": "AI experiment agent loop",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "REQ-AIRA-MEMORY-001",
@@ -157,13 +157,60 @@
     {
       "id": "AIRA-AGENT-001",
       "title": "Implement AI experiment agent MVP",
-      "status": "pending",
+      "status": "completed",
       "requirement_ids": [
         "REQ-AIRA-AGENT-001",
         "REQ-AIRA-MEMORY-001"
       ],
-      "evidence": [],
-      "next_action": "Design tool registry, run ledger, and guarded experiment execution loop."
+      "evidence": [
+        {
+          "kind": "command",
+          "value": "python3 -m aira agent smoke --out /tmp/aira_agent_bundle --json"
+        },
+        {
+          "kind": "command",
+          "value": "python3 -m aira bundles validate /tmp/aira_agent_bundle --json"
+        },
+        {
+          "kind": "test",
+          "value": "python3 -m pytest -q tests/test_experiment_bundle.py tests/test_bootstrap.py tests/test_local_benchmark.py"
+        },
+        {
+          "kind": "artifact",
+          "path": "aira/agent.py"
+        },
+        {
+          "kind": "artifact",
+          "path": "docs/aira_implementation_status.zh.md"
+        },
+        {
+          "kind": "record",
+          "value": "task report: .engineering/reports/tasks/20260519T131540Z-AIRA-AGENT-001.md",
+          "recorded_at": "2026-05-19T13:22:31Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task manifest: .engineering/reports/tasks/20260519T131540Z-AIRA-AGENT-001.json",
+          "recorded_at": "2026-05-19T13:22:31Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task result: All required acceptance commands passed.",
+          "recorded_at": "2026-05-19T13:22:31Z",
+          "actor": "engineering-harness:auto"
+        }
+      ],
+      "remaining_limits": [
+        "The MVP agent can execute only the registered deterministic local benchmark runner.",
+        "Agent memory is persisted in the emitted result bundle, not in a shared service.",
+        "No live model APIs, GPU execution, external datasets, or network access are enabled."
+      ],
+      "next_action": "Add additional deterministic local runners and promote bundle-local agent memory into a shared local memory index when needed.",
+      "updated_at": "2026-05-19T13:22:31Z",
+      "last_note": "Recorded automatically after a completed harness task.",
+      "last_phase": "run"
     },
     {
       "id": "AIRA-ARA-001",

@@ -25,6 +25,7 @@ def test_labs_inspect_cli_emits_manifest_json(capsys):
     assert payload["bundle_types"] == ["aira_result_bundle"]
     assert payload["registries"]["datasets"] == "aira/registries/datasets.json"
     assert "python3 -m aira run-local-benchmark" in payload["entrypoints"]["direct_tools"]
+    assert "python3 -m aira agent smoke" in payload["entrypoints"]["direct_tools"]
 
 
 def test_registry_placeholders_are_local_and_deterministic():

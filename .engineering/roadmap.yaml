@@ -155,12 +155,12 @@ milestones:
       timeout_seconds: 120
 - id: aira-agent-loop-mvp
   title: AIRA Agent Loop MVP
-  status: active
+  status: completed
   objective: Build the first deterministic AI experiment agent loop over local registries, run memory, and bundle emission without live model APIs or external datasets.
   tasks:
   - id: AIRA-AGENT-001
     title: Implement AI experiment agent MVP
-    status: pending
+    status: completed
     max_attempts: 2
     max_task_iterations: 3
     manual_approval_required: false

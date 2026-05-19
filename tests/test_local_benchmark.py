@@ -1,6 +1,7 @@
 import json
 
 from aira import cli
+from aira.agent import build_agent_plan, run_agent_smoke, select_local_experiment
 from aira.benchmark import (
     LOCAL_BENCHMARK_ID,
     LOCAL_DATASET_ID,
@@ -120,3 +121,67 @@ def test_local_benchmark_is_registered():
         "provenance",
         "run_ledger",
     ]
+
+
+def test_agent_selects_safe_registered_local_experiment(tmp_path):
+    selection = select_local_experiment()
+    plan = build_agent_plan(tmp_path / "agent_bundle")
+
+    assert selection["benchmark"]["id"] == LOCAL_BENCHMARK_ID
+    assert selection["dataset"]["id"] == LOCAL_DATASET_ID
+    assert selection["models"][0]["id"] == LOCAL_MODEL_ID
+    assert plan["schema_version"] == "aira.agent_plan.v1"
+    assert plan["selected_registry_entries"] == {
+        "benchmark_id": LOCAL_BENCHMARK_ID,
+        "dataset_id": LOCAL_DATASET_ID,
+        "model_ids": [
+            LOCAL_MODEL_ID,
+            "deterministic-pass-prior-baseline-v1",
+        ],
+        "primary_model_id": LOCAL_MODEL_ID,
+    }
+    assert [step["phase"] for step in plan["steps"]] == ["plan", "act", "observe", "reflect"]
+    assert plan["bounds"]["live_model_calls"] is False
+    assert plan["bounds"]["network_required"] is False
+
+
+def test_agent_smoke_emits_valid_bundle_with_reusable_memory(tmp_path):
+    output = tmp_path / "agent_bundle"
+
+    payload = run_agent_smoke(output)
+
+    assert payload["status"] == "passed"
+    assert payload["validation"]["valid"] is True
+    assert [step["phase"] for step in payload["loop"]] == ["plan", "act", "observe", "reflect"]
+    assert all(step["status"] == "completed" for step in payload["loop"])
+    assert payload["selected_registry_entries"]["benchmark_id"] == LOCAL_BENCHMARK_ID
+    assert payload["memory"]["entry"]["outcome"] == "accepted"
+    assert payload["memory"]["entry"]["bundle_valid"] is True
+    assert payload["memory"]["entry"]["metrics"]["accuracy_delta"] == 0.5
+
+    agent_memory = json.loads((output / "memory" / "agent_memory.json").read_text(encoding="utf-8"))
+    agent_memory_lines = (output / "memory" / "agent_memory.jsonl").read_text(encoding="utf-8").splitlines()
+    agent_trace = json.loads((output / "artifacts" / "agent_trace.json").read_text(encoding="utf-8"))
+    claims = json.loads((output / "claims.json").read_text(encoding="utf-8"))
+    validation = validate_bundle(output)
+
+    assert validation.valid
+    assert agent_memory["entries"] == [payload["memory"]["entry"]]
+    assert json.loads(agent_memory_lines[0]) == payload["memory"]["entry"]
+    assert agent_trace["reflection"]["outcome"] == "accepted"
+    assert {claim["claim_id"] for claim in claims["claims"]} >= {
+        "aira-local-benchmark-c1",
+        "aira-agent-smoke-c1",
+    }
+
+
+def test_agent_smoke_cli_emits_json(tmp_path, capsys):
+    output = tmp_path / "agent_cli_bundle"
+
+    exit_code = cli.main(["agent", "smoke", "--out", str(output), "--json"])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "passed"
+    assert payload["validation"]["valid"] is True
+    assert payload["memory"]["entry"]["selected_registry_entries"]["benchmark_id"] == LOCAL_BENCHMARK_ID

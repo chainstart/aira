@@ -15,6 +15,7 @@ entrypoints:
     - python3 -m aira migrate inventory
     - python3 -m aira run-fixture-benchmark
     - python3 -m aira run-local-benchmark
+    - python3 -m aira agent smoke
 commands:
   allow_prefixes:
     - python3 -m aira
@@ -39,6 +40,7 @@ artifacts:
     - tests/fixtures/aira_result_bundle/**
     - runs/*/aira_result_bundle/**
     - runs/*/local_benchmark/**
+    - runs/*/agent/**
   exclude:
     - '**/__pycache__/**'
 bundles:
