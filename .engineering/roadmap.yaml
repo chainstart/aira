@@ -255,6 +255,65 @@ milestones:
       command: python3 -c "import sys; sys.path.insert(0, '/home/biostar/work/projects/engineering-harness/src'); from engineering_harness.cli import main; raise SystemExit(main(['spec-sync', 'audit', '--project-root', '.', '--json']))" >/tmp/aira_spec_sync_audit.json
       required: true
       timeout_seconds: 120
+- id: aira-real-benchmark-extension
+  title: AIRA Real Benchmark Extension
+  status: active
+  objective: Complete the ARA ecosystem AIRA-REAL-BENCH-001 direction by extending AIRA beyond fixture smoke toward richer deterministic local benchmark, ablation, error-analysis, and experiment-memory behavior without live model or network dependencies.
+  tasks:
+  - id: AIRA-REAL-BENCH-001
+    title: Build AIRA real benchmark and experiment agent beyond fixture smoke
+    status: pending
+    max_attempts: 2
+    max_task_iterations: 3
+    manual_approval_required: false
+    file_scope:
+    - aira/**
+    - tests/**
+    - docs/**
+    - research_lab.yaml
+    - .engineering/spec_tasks.yaml
+    - .engineering/roadmap.yaml
+    implementation:
+    - name: codex extends AIRA local benchmark capability
+      executor: codex
+      timeout_seconds: 7200
+      no_progress_timeout_seconds: 1200
+      requested_capabilities:
+      - agent
+      prompt: >-
+        Implement ARA ecosystem task AIRA-REAL-BENCH-001 inside the AIRA
+        repository. Extend the deterministic local benchmark/experiment agent
+        beyond fixture smoke with richer local dataset/model fixtures, ablation
+        or error-analysis artifacts, reusable experiment memory, and
+        ARA-consumable bundle metadata. Keep all execution local and
+        deterministic: no network datasets, live model APIs, GPU requirements,
+        or external accounts. Update CLI/tests/docs/research_lab.yaml/spec
+        tracking as needed.
+    repair:
+    - name: codex repairs AIRA real benchmark extension
+      executor: codex
+      timeout_seconds: 3000
+      no_progress_timeout_seconds: 900
+      requested_capabilities:
+      - agent
+      prompt: Repair AIRA-REAL-BENCH-001 using failing acceptance evidence. Keep changes scoped to AIRA local benchmark/agent/memory/bundle metadata, tests, docs, research_lab.yaml, and spec tracking.
+    acceptance:
+    - name: AIRA local benchmark emits enriched bundle
+      command: python3 -m aira run-local-benchmark --out /tmp/aira_real_benchmark_bundle --json >/tmp/aira_real_benchmark.json
+      required: true
+      timeout_seconds: 300
+    - name: AIRA agent smoke emits bundle
+      command: python3 -m aira agent smoke --out /tmp/aira_real_agent_bundle --json >/tmp/aira_real_agent.json
+      required: true
+      timeout_seconds: 300
+    - name: AIRA test suite passes
+      command: python3 -m pytest -q
+      required: true
+      timeout_seconds: 900
+    - name: AIRA dynamic spec audit passes
+      command: python3 -c "import sys; sys.path.insert(0, '/home/biostar/work/projects/engineering-harness/src'); from engineering_harness.cli import main; raise SystemExit(main(['spec-sync', 'audit', '--project-root', '.', '--json']))" >/tmp/aira_spec_sync_audit.json
+      required: true
+      timeout_seconds: 120
 profile: python-agent
 project: aira
 report_dir: .engineering/reports/tasks
