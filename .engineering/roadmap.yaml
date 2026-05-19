@@ -204,6 +204,57 @@ milestones:
       command: python3 -c "import sys; sys.path.insert(0, '/home/biostar/work/projects/engineering-harness/src'); from engineering_harness.cli import main; raise SystemExit(main(['spec-sync', 'audit', '--project-root', '.', '--json']))" >/tmp/aira_spec_sync_audit.json
       required: true
       timeout_seconds: 120
+- id: aira-ara-integration-readiness
+  title: AIRA ARA Integration Readiness
+  status: active
+  objective: Complete the existing AIRA-ARA-001 spec task by making AIRA's deterministic bundles explicitly consumable by ARA reproduction and bundle gates without adding live model, network, GPU, or external dataset dependencies.
+  tasks:
+  - id: AIRA-ARA-001
+    title: Prove ARA can consume AIRA bundles with reproducibility gates
+    status: pending
+    max_attempts: 2
+    max_task_iterations: 3
+    manual_approval_required: false
+    file_scope:
+    - aira/**
+    - tests/**
+    - docs/**
+    - research_lab.yaml
+    - .engineering/spec_tasks.yaml
+    - .engineering/roadmap.yaml
+    implementation:
+    - name: codex implements AIRA ARA integration readiness
+      executor: codex
+      timeout_seconds: 5400
+      no_progress_timeout_seconds: 900
+      requested_capabilities:
+      - agent
+      prompt: Implement AIRA dynamic spec task AIRA-ARA-001. Add a deterministic local integration smoke proving AIRA result bundles carry the metadata, artifact manifest, reproducibility notes, claims, and run ledger needed by public ARA bundle/reproduction gates. Keep the implementation inside AIRA; do not edit the ARA repository. Add or update CLI smoke coverage, focused tests, docs, research_lab.yaml bundle/dispatch metadata if needed, and dynamic spec tracking. Do not add live model APIs, network datasets, GPU requirements, or external service dependencies.
+    repair:
+    - name: codex repairs AIRA ARA integration readiness
+      executor: codex
+      timeout_seconds: 2400
+      no_progress_timeout_seconds: 600
+      requested_capabilities:
+      - agent
+      prompt: Repair AIRA-ARA-001 using failing acceptance evidence. Keep changes scoped to AIRA bundle metadata, reproducibility notes, tests, docs, research_lab.yaml, and spec tracking. Do not edit ARA or add network/model dependencies.
+    acceptance:
+    - name: AIRA agent smoke emits ARA-consumable bundle
+      command: python3 -m aira agent smoke --out /tmp/aira_ara_agent_bundle --json >/tmp/aira_ara_agent_smoke.json
+      required: true
+      timeout_seconds: 300
+    - name: AIRA ARA handoff bundle validates
+      command: python3 -m aira bundles validate /tmp/aira_ara_agent_bundle --json >/tmp/aira_ara_bundle_validate.json
+      required: true
+      timeout_seconds: 180
+    - name: AIRA integration tests pass
+      command: python3 -m pytest -q tests/test_experiment_bundle.py tests/test_bootstrap.py tests/test_local_benchmark.py
+      required: true
+      timeout_seconds: 480
+    - name: AIRA dynamic spec audit passes
+      command: python3 -c "import sys; sys.path.insert(0, '/home/biostar/work/projects/engineering-harness/src'); from engineering_harness.cli import main; raise SystemExit(main(['spec-sync', 'audit', '--project-root', '.', '--json']))" >/tmp/aira_spec_sync_audit.json
+      required: true
+      timeout_seconds: 120
 profile: python-agent
 project: aira
 report_dir: .engineering/reports/tasks
