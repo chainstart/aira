@@ -1,4 +1,4 @@
-"""Placeholder registries for AIRA datasets, models, and benchmarks."""
+"""Registries for AIRA datasets, models, and benchmarks."""
 
 from __future__ import annotations
 
@@ -15,7 +15,18 @@ DATASETS: list[dict[str, Any]] = [
         "rows": 6,
         "network_required": False,
         "intended_use": "Smoke-test bundle emission and validator contracts.",
-    }
+    },
+    {
+        "id": "local-experiment-outcomes-v1",
+        "name": "Local experiment outcome text classification set",
+        "status": "local_deterministic",
+        "source": "builtin_local_fixture",
+        "rows": 8,
+        "label_set": ["fail", "pass"],
+        "network_required": False,
+        "external_datasets_required": False,
+        "intended_use": "Exercise local benchmark execution, provenance, and run ledger persistence.",
+    },
 ]
 
 MODELS: list[dict[str, Any]] = [
@@ -35,6 +46,26 @@ MODELS: list[dict[str, Any]] = [
         "live_model_calls": False,
         "intended_use": "Local comparison baseline for fixture smoke.",
     },
+    {
+        "id": "deterministic-keyword-outcome-classifier-v1",
+        "name": "Deterministic keyword outcome classifier",
+        "status": "local_deterministic",
+        "implementation": "aira.benchmark.keyword_outcome_predict",
+        "live_model_calls": False,
+        "network_required": False,
+        "gpu_required": False,
+        "intended_use": "Local text classification benchmark runner without external dependencies.",
+    },
+    {
+        "id": "deterministic-pass-prior-baseline-v1",
+        "name": "Deterministic pass-prior baseline",
+        "status": "local_deterministic",
+        "implementation": "aira.benchmark.pass_prior_predict",
+        "live_model_calls": False,
+        "network_required": False,
+        "gpu_required": False,
+        "intended_use": "Deterministic baseline for the local text outcome benchmark.",
+    },
 ]
 
 BENCHMARKS: list[dict[str, Any]] = [
@@ -47,7 +78,25 @@ BENCHMARKS: list[dict[str, Any]] = [
         "metric_ids": ["accuracy", "accuracy_delta"],
         "network_required": False,
         "emits_bundle_type": "aira_result_bundle",
-    }
+    },
+    {
+        "id": "local-text-outcome-classification",
+        "name": "AIRA deterministic local text outcome benchmark",
+        "status": "local_deterministic",
+        "dataset_id": "local-experiment-outcomes-v1",
+        "model_ids": [
+            "deterministic-keyword-outcome-classifier-v1",
+            "deterministic-pass-prior-baseline-v1",
+        ],
+        "metric_ids": ["accuracy", "macro_f1", "baseline_accuracy", "accuracy_delta"],
+        "network_required": False,
+        "external_datasets_required": False,
+        "gpu_required": False,
+        "live_model_calls": False,
+        "emits_bundle_type": "aira_result_bundle",
+        "emits_artifact_kinds": ["benchmark_report", "provenance", "run_ledger"],
+        "entrypoint": "python3 -m aira run-local-benchmark",
+    },
 ]
 
 

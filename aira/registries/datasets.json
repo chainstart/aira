@@ -8,6 +8,20 @@
       "rows": 6,
       "source": "local_synthetic",
       "status": "placeholder"
+    },
+    {
+      "external_datasets_required": false,
+      "id": "local-experiment-outcomes-v1",
+      "intended_use": "Exercise local benchmark execution, provenance, and run ledger persistence.",
+      "label_set": [
+        "fail",
+        "pass"
+      ],
+      "name": "Local experiment outcome text classification set",
+      "network_required": false,
+      "rows": 8,
+      "source": "builtin_local_fixture",
+      "status": "local_deterministic"
     }
   ],
   "schema_version": "aira.dataset_registry.v1"

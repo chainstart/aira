@@ -87,7 +87,7 @@ milestones:
   tasks:
   - id: AIRA-BENCHMARK-001
     title: Move beyond fixture benchmark to real AI experiment runners
-    status: pending
+    status: completed
     max_attempts: 2
     max_task_iterations: 3
     manual_approval_required: false

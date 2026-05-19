@@ -24,6 +24,7 @@ def test_labs_inspect_cli_emits_manifest_json(capsys):
     assert payload["entrypoints"]["agent_cli"] == ["python3 -m aira"]
     assert payload["bundle_types"] == ["aira_result_bundle"]
     assert payload["registries"]["datasets"] == "aira/registries/datasets.json"
+    assert "python3 -m aira run-local-benchmark" in payload["entrypoints"]["direct_tools"]
 
 
 def test_registry_placeholders_are_local_and_deterministic():
@@ -33,3 +34,11 @@ def test_registry_placeholders_are_local_and_deterministic():
     assert payload["datasets"][0]["network_required"] is False
     assert all(model["live_model_calls"] is False for model in payload["models"])
     assert payload["benchmarks"][0]["emits_bundle_type"] == "aira_result_bundle"
+    assert {dataset["id"] for dataset in payload["datasets"]} >= {
+        "fixture-ai-classification",
+        "local-experiment-outcomes-v1",
+    }
+    assert {benchmark["id"] for benchmark in payload["benchmarks"]} >= {
+        "fixture-classification-smoke",
+        "local-text-outcome-classification",
+    }

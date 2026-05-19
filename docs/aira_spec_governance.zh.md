@@ -15,6 +15,7 @@ AIRA 是 ARA 生态中的 AI/ML 领域实验室。它负责 AI 研究所需的�
 - `python3 -m aira bundles validate <bundle> --json`：验证 `aira_result_bundle`。
 - `python3 -m aira migrate inventory --source <ara-repo> --json`：盘点从 ARA 迁出的 AI 实验职责。
 - `python3 -m aira run-fixture-benchmark --out <dir> --json`：生成确定性 fixture benchmark bundle。
+- `python3 -m aira run-local-benchmark --out <dir> --json`：运行本地确定性文本分类 benchmark，生成含 provenance 与 run ledger 的 `aira_result_bundle`。
 
 ## 3. Requirement ID
 
@@ -30,7 +31,7 @@ AIRA 是 ARA 生态中的 AI/ML 领域实验室。它负责 AI 研究所需的�
 ## 4. 动态维护规则
 
 1. 新增 AI 实验能力前，先写入 requirement ID 和任务台账。
-2. 每个任务完成后，必须记录测试命令、fixture bundle、benchmark 结果或 blocker。
+2. 每个任务完成后，必须记录测试命令、fixture/local bundle、benchmark 结果或 blocker。
 3. 真实模型调用、数据下载和昂贵 benchmark 必须和 fixture smoke 分离。
 4. ARA 消费 AIRA 结果时，只能依据 bundle 中声明的 evidence 和 reproducibility notes。
 5. engineering-harness 接手 AIRA 任务后，应在任务结束时更新 `.engineering/spec_tasks.yaml` 和 `docs/spec_update_log.jsonl`。

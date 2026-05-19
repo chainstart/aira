@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from aira import __version__
-from aira.benchmark import write_fixture_bundle
+from aira.benchmark import write_fixture_bundle, write_local_benchmark_bundle
 from aira.bundles import validate_bundle
 from aira.manifest import DEFAULT_MANIFEST_PATH, load_manifest
 from aira.migration import build_inventory
@@ -51,6 +51,13 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--out", required=True, help="Output bundle directory.")
     benchmark.add_argument("--json", action="store_true", help="Print JSON output.")
 
+    local_benchmark = subparsers.add_parser(
+        "run-local-benchmark",
+        help="Run the deterministic local benchmark and emit an AIRA result bundle.",
+    )
+    local_benchmark.add_argument("--out", required=True, help="Output bundle directory.")
+    local_benchmark.add_argument("--json", action="store_true", help="Print JSON output.")
+
     registries = subparsers.add_parser("registries", help="Print registry placeholders.")
     registries.add_argument("--json", action="store_true", help="Print JSON output.")
     return parser
@@ -82,6 +89,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "run-fixture-benchmark":
         payload = write_fixture_bundle(Path(args.out))
+        _print_payload(payload, as_json=args.json)
+        return 0 if payload["status"] == "passed" else 1
+
+    if args.command == "run-local-benchmark":
+        payload = write_local_benchmark_bundle(Path(args.out))
         _print_payload(payload, as_json=args.json)
         return 0 if payload["status"] == "passed" else 1
 

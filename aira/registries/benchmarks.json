@@ -15,6 +15,33 @@
       "name": "AIRA deterministic fixture benchmark",
       "network_required": false,
       "status": "mvp"
+    },
+    {
+      "dataset_id": "local-experiment-outcomes-v1",
+      "emits_artifact_kinds": [
+        "benchmark_report",
+        "provenance",
+        "run_ledger"
+      ],
+      "emits_bundle_type": "aira_result_bundle",
+      "entrypoint": "python3 -m aira run-local-benchmark",
+      "external_datasets_required": false,
+      "gpu_required": false,
+      "id": "local-text-outcome-classification",
+      "live_model_calls": false,
+      "metric_ids": [
+        "accuracy",
+        "macro_f1",
+        "baseline_accuracy",
+        "accuracy_delta"
+      ],
+      "model_ids": [
+        "deterministic-keyword-outcome-classifier-v1",
+        "deterministic-pass-prior-baseline-v1"
+      ],
+      "name": "AIRA deterministic local text outcome benchmark",
+      "network_required": false,
+      "status": "local_deterministic"
     }
   ],
   "schema_version": "aira.benchmark_registry.v1"

@@ -15,6 +15,26 @@
       "live_model_calls": false,
       "name": "Fixture majority baseline",
       "status": "placeholder"
+    },
+    {
+      "gpu_required": false,
+      "id": "deterministic-keyword-outcome-classifier-v1",
+      "implementation": "aira.benchmark.keyword_outcome_predict",
+      "intended_use": "Local text classification benchmark runner without external dependencies.",
+      "live_model_calls": false,
+      "name": "Deterministic keyword outcome classifier",
+      "network_required": false,
+      "status": "local_deterministic"
+    },
+    {
+      "gpu_required": false,
+      "id": "deterministic-pass-prior-baseline-v1",
+      "implementation": "aira.benchmark.pass_prior_predict",
+      "intended_use": "Deterministic baseline for the local text outcome benchmark.",
+      "live_model_calls": false,
+      "name": "Deterministic pass-prior baseline",
+      "network_required": false,
+      "status": "local_deterministic"
     }
   ],
   "schema_version": "aira.model_registry.v1"

@@ -231,6 +231,124 @@ def _validate_claims(
     return len(claims)
 
 
+def _artifact_paths_for(
+    artifact_details: dict[str, dict[str, Any]],
+    *,
+    artifact_ids: set[str],
+    kinds: set[str],
+) -> list[str]:
+    paths = {
+        detail["path"]
+        for detail in artifact_details.values()
+        if isinstance(detail.get("path"), str)
+        and detail["path"]
+        and (detail.get("artifact_id") in artifact_ids or detail.get("kind") in kinds)
+    }
+    return sorted(paths)
+
+
+def _is_sha256(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdef" for char in value)
+
+
+def _validate_false_flag(
+    mapping: dict[str, Any],
+    key: str,
+    source: str,
+    errors: list[str],
+) -> None:
+    if mapping.get(key) is not False:
+        errors.append(f"{source} field `{key}` must be false for deterministic local AIRA bundles.")
+
+
+def _validate_provenance_artifact(payload: Any, source: str, errors: list[str]) -> None:
+    if not isinstance(payload, dict):
+        errors.append(f"{source} must contain a JSON object.")
+        return
+    for key in ("schema_version", "run_id", "benchmark_id", "dataset_id", "model_id"):
+        _required_string(payload, key, source, errors)
+    fingerprints = payload.get("input_fingerprints")
+    if not isinstance(fingerprints, dict):
+        errors.append(f"{source} field `input_fingerprints` must be an object.")
+    else:
+        for key in ("dataset_sha256", "model_config_sha256", "registry_snapshot_sha256"):
+            if not _is_sha256(fingerprints.get(key)):
+                errors.append(f"{source} input_fingerprints.{key} must be a lowercase sha256 hex digest.")
+    execution = payload.get("execution")
+    if not isinstance(execution, dict):
+        errors.append(f"{source} field `execution` must be an object.")
+    else:
+        for key in ("runner", "command", "package_version", "python_version"):
+            _required_string(execution, key, f"{source}.execution", errors)
+    determinism = payload.get("determinism")
+    if not isinstance(determinism, dict):
+        errors.append(f"{source} field `determinism` must be an object.")
+    else:
+        if determinism.get("deterministic") is not True:
+            errors.append(f"{source} determinism.deterministic must be true.")
+        for key in ("network_required", "external_datasets_required", "gpu_required", "live_model_calls"):
+            _validate_false_flag(determinism, key, f"{source}.determinism", errors)
+
+
+def _validate_run_ledger_entry(payload: Any, source: str, errors: list[str]) -> None:
+    if not isinstance(payload, dict):
+        errors.append(f"{source} must contain a JSON object.")
+        return
+    for key in ("schema_version", "run_id", "status", "bundle_type", "benchmark_id", "dataset_id", "model_id"):
+        _required_string(payload, key, source, errors)
+    if payload.get("bundle_type") != "aira_result_bundle":
+        errors.append(f"{source} field `bundle_type` must be `aira_result_bundle`.")
+    if payload.get("status") not in {"passed", "failed"}:
+        errors.append(f"{source} field `status` must be `passed` or `failed`.")
+    metrics = payload.get("metrics")
+    if not isinstance(metrics, dict) or not metrics:
+        errors.append(f"{source} field `metrics` must be a non-empty object.")
+    reproducibility = payload.get("reproducibility")
+    if not isinstance(reproducibility, dict):
+        errors.append(f"{source} field `reproducibility` must be an object.")
+    else:
+        if reproducibility.get("deterministic") is not True:
+            errors.append(f"{source} reproducibility.deterministic must be true.")
+        for key in ("network_required", "external_datasets_required", "gpu_required", "live_model_calls"):
+            _validate_false_flag(reproducibility, key, f"{source}.reproducibility", errors)
+
+
+def _run_id_from_ledger_payload(payload: Any) -> str | None:
+    if isinstance(payload, dict) and isinstance(payload.get("run_id"), str) and payload["run_id"].strip():
+        return payload["run_id"].strip()
+    return None
+
+
+def _validate_run_ledger_artifact(path: Path, source: str, errors: list[str]) -> set[str]:
+    run_ids: set[str] = set()
+    if path.suffix == ".jsonl":
+        try:
+            lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        except Exception as exc:
+            errors.append(f"Could not read JSONL file {source}: {exc}")
+            return run_ids
+        if not lines:
+            errors.append(f"{source} must contain at least one JSONL entry.")
+            return run_ids
+        for index, line in enumerate(lines):
+            try:
+                payload = json.loads(line)
+            except Exception as exc:
+                errors.append(f"{source} line {index + 1} is not valid JSON: {exc}")
+                continue
+            _validate_run_ledger_entry(payload, f"{source} line {index + 1}", errors)
+            run_id = _run_id_from_ledger_payload(payload)
+            if run_id:
+                run_ids.add(run_id)
+        return run_ids
+    payload = _read_json(path, errors)
+    _validate_run_ledger_entry(payload, source, errors)
+    run_id = _run_id_from_ledger_payload(payload)
+    if run_id:
+        run_ids.add(run_id)
+    return run_ids
+
+
 def validate_bundle(bundle_path: str | Path) -> BundleValidationResult:
     path = Path(bundle_path).expanduser().resolve()
     errors: list[str] = []
@@ -304,6 +422,45 @@ def validate_bundle(bundle_path: str | Path) -> BundleValidationResult:
             "pass" if len(errors) == before else "fail",
             "artifact_manifest.json declares resolvable bundle artifacts.",
         )
+        provenance_paths = _artifact_paths_for(
+            artifact_details,
+            artifact_ids={"provenance"},
+            kinds={"provenance"},
+        )
+        if provenance_paths:
+            before = len(errors)
+            for relative in provenance_paths:
+                _validate_provenance_artifact(
+                    _read_json(path / relative, errors),
+                    relative,
+                    errors,
+                )
+            metadata["provenance_artifacts"] = provenance_paths
+            _check(
+                checks,
+                "provenance_artifacts",
+                "pass" if len(errors) == before else "fail",
+                "Provenance artifacts declare deterministic local execution inputs.",
+            )
+        run_ledger_paths = _artifact_paths_for(
+            artifact_details,
+            artifact_ids={"run_ledger", "run_ledger_entry"},
+            kinds={"run_ledger", "run_ledger_entry"},
+        )
+        if run_ledger_paths:
+            before = len(errors)
+            run_ids: set[str] = set()
+            for relative in run_ledger_paths:
+                run_ids.update(_validate_run_ledger_artifact(path / relative, relative, errors))
+            metadata["run_ledger_artifacts"] = run_ledger_paths
+            metadata["run_ledger_entry_count"] = len(run_ids)
+            metadata["run_ledger_run_ids"] = sorted(run_ids)
+            _check(
+                checks,
+                "run_ledger_artifacts",
+                "pass" if len(errors) == before else "fail",
+                "Run ledger artifacts contain machine-readable experiment memory entries.",
+            )
 
     claims_path = path / "claims.json"
     if claims_path.exists():
