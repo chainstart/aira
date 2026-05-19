@@ -79,6 +79,76 @@ milestones:
       command: python3 -m pytest -q tests/test_ai_migration.py tests/test_experiment_bundle.py
       required: true
       timeout_seconds: 300
+- id: aira-next-spec-development
+  title: AIRA Next Spec Development
+  status: active
+  objective: Complete the next AIRA dynamic-spec task by replacing the fixture-only
+    benchmark smoke with a deterministic local benchmark runner and run memory.
+  tasks:
+  - id: AIRA-BENCHMARK-001
+    title: Move beyond fixture benchmark to real AI experiment runners
+    status: pending
+    max_attempts: 2
+    max_task_iterations: 3
+    manual_approval_required: false
+    file_scope:
+    - aira/**
+    - tests/**
+    - docs/**
+    - research_lab.yaml
+    - .engineering/spec_tasks.yaml
+    - .engineering/roadmap.yaml
+    implementation:
+    - name: codex implements deterministic local benchmark runner
+      executor: codex
+      timeout_seconds: 5400
+      no_progress_timeout_seconds: 900
+      requested_capabilities:
+      - agent
+      prompt: |
+        Implement AIRA dynamic spec task AIRA-BENCHMARK-001.
+
+        Move AIRA beyond a fixture-only benchmark by adding a small deterministic
+        local benchmark runner. The runner should use local dataset/model fixtures
+        or built-in deterministic baselines, record provenance, emit an AIRA result
+        bundle, and persist a run ledger/memory entry suitable for later experiment
+        agents. Do not require network access, live model APIs, GPU hardware, or
+        external datasets.
+
+        Update dataset/model/benchmark registries, CLI entry points, bundle validation
+        where needed, docs, and the dynamic spec task ledger/status so
+        AIRA-BENCHMARK-001 records its evidence and any remaining limits. Add focused
+        tests for the runner, bundle output, provenance, registry integration, and
+        run ledger persistence.
+    repair:
+    - name: codex repairs deterministic benchmark task
+      executor: codex
+      timeout_seconds: 2400
+      no_progress_timeout_seconds: 600
+      requested_capabilities:
+      - agent
+      prompt: |
+        Repair AIRA-BENCHMARK-001 using the failing acceptance evidence. Keep changes
+        scoped to deterministic local benchmark execution, registries, bundle output,
+        run ledger/memory, tests, docs, and dynamic spec task tracking. Do not add
+        live model API calls or network-dependent benchmarks.
+    acceptance:
+    - name: AIRA local benchmark emits result bundle
+      command: python3 -m aira run-local-benchmark --out /tmp/aira_local_benchmark_bundle --json >/tmp/aira_local_benchmark.json
+      required: true
+      timeout_seconds: 240
+    - name: AIRA local benchmark bundle validates
+      command: python3 -m aira bundles validate /tmp/aira_local_benchmark_bundle --json >/tmp/aira_local_bundle_validate.json
+      required: true
+      timeout_seconds: 120
+    - name: AIRA benchmark focused tests pass
+      command: python3 -m pytest -q tests/test_local_benchmark.py tests/test_experiment_bundle.py tests/test_bootstrap.py
+      required: true
+      timeout_seconds: 480
+    - name: AIRA dynamic spec audit passes
+      command: python3 -c "import sys; sys.path.insert(0, '/home/biostar/work/projects/engineering-harness/src'); from engineering_harness.cli import main; raise SystemExit(main(['spec-sync', 'audit', '--project-root', '.', '--json']))" >/tmp/aira_spec_sync_audit.json
+      required: true
+      timeout_seconds: 120
 profile: python-agent
 project: aira
 report_dir: .engineering/reports/tasks
