@@ -23,6 +23,8 @@ def test_labs_inspect_cli_emits_manifest_json(capsys):
     assert payload["status"] == "found"
     assert payload["entrypoints"]["agent_cli"] == ["python3 -m aira"]
     assert payload["bundle_types"] == ["aira_result_bundle"]
+    assert payload["bundle_handoff_profiles"][0]["profile"] == "ara-public-bundle-reproduction-gate.v1"
+    assert "artifacts/ara_handoff.json" in payload["bundle_handoff_profiles"][0]["required_artifacts"]
     assert payload["registries"]["datasets"] == "aira/registries/datasets.json"
     assert "python3 -m aira run-local-benchmark" in payload["entrypoints"]["direct_tools"]
     assert "python3 -m aira agent smoke" in payload["entrypoints"]["direct_tools"]

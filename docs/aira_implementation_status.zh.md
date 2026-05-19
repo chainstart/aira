@@ -21,7 +21,7 @@
 | `REQ-AIRA-BUNDLE-001` | `completed` | bundle validator、fixture result bundle | 需要更多实验类型 schema | 扩展 result bundle schema |
 | `REQ-AIRA-AGENT-001` | `completed` | `python3 -m aira agent smoke --out <dir> --json`、agent plan/trace/observation/reflection artifacts | 仅执行已注册的本地确定性 benchmark | 增加更多本地 runner 后扩展 agent 选择策略 |
 | `REQ-AIRA-MEMORY-001` | `partial` | bundle-local `memory/run_ledger.jsonl`、`artifacts/run_ledger_entry.json`、`memory/agent_memory.json` 和 `memory/agent_memory.jsonl` | 缺跨 run 的共享 memory service、失败重试和 agent 检索接口 | 后续建设共享本地 memory index |
-| `REQ-AIRA-ARA-001` | `partial` | migration inventory 和 bundle contract | 需要跨仓库消费 smoke 和复现 gate | 增加 ARA + AIRA integration test |
+| `REQ-AIRA-ARA-001` | `completed` | ARA handoff-ready agent bundle、`artifacts/ara_handoff.json`、`artifacts/reproducibility_notes.md`、bundle validator 的 `ara_gate` profile | 仅证明本地确定性 bundle 可被 ARA public gate 消费；未接入 ARA 仓库端到端测试 | ARA contract 变更时同步更新 handoff profile |
 
 ## 维护流程
 
@@ -40,3 +40,13 @@
 - `reflect`：写入 `artifacts/agent_reflection.json`、`memory/agent_memory.json` 和 `memory/agent_memory.jsonl`。
 
 该 MVP 不访问网络、不调用在线模型、不依赖 GPU 或外部数据集。共享 memory service、跨 run 检索和多 runner 策略仍属于后续工作。
+
+## ARA Handoff
+
+`python3 -m aira agent smoke --out <dir> --json` 现在会在 bundle 中写入 ARA-facing handoff metadata：
+
+- `artifacts/ara_handoff.json`：声明 `ara-public-bundle-reproduction-gate.v1` profile、bundle schema、验证命令、复现命令、必需 gate 输入、determinism flags 和 claims gate。
+- `artifacts/reproducibility_notes.md`：记录本地复现命令、输入 fingerprints、无网络/无 GPU/无 live model API 限制和 agent smoke 复现说明。
+- `memory/run_ledger.jsonl` 与 `artifacts/run_ledger_entry.json`：保留可机器读取的 bundle-local run ledger。
+
+`python3 -m aira bundles validate <bundle> --json` 会在 validation metadata 中暴露 `ara_gate`，并检查 handoff metadata、reproducibility notes、claims、provenance 与 run ledger 是否能满足本地 ARA public reproduction gate。

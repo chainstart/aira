@@ -206,12 +206,12 @@ milestones:
       timeout_seconds: 120
 - id: aira-ara-integration-readiness
   title: AIRA ARA Integration Readiness
-  status: active
+  status: completed
   objective: Complete the existing AIRA-ARA-001 spec task by making AIRA's deterministic bundles explicitly consumable by ARA reproduction and bundle gates without adding live model, network, GPU, or external dataset dependencies.
   tasks:
   - id: AIRA-ARA-001
     title: Prove ARA can consume AIRA bundles with reproducibility gates
-    status: pending
+    status: completed
     max_attempts: 2
     max_task_iterations: 3
     manual_approval_required: false

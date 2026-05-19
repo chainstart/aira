@@ -11,6 +11,7 @@ from aira.benchmark import (
     LOCAL_COMMAND,
     LOCAL_DATASET_ID,
     LOCAL_MODEL_ID,
+    LOCAL_TASK_ID,
     write_local_benchmark_bundle,
 )
 from aira.bundles import validate_bundle, write_json
@@ -144,6 +145,8 @@ def _append_agent_claim(bundle_path: Path) -> None:
             "reproduction_status": "reproduced",
             "supported_by": [
                 "reproduction_status",
+                "ara_handoff",
+                "reproducibility_notes",
                 "agent_plan",
                 "agent_trace",
                 "agent_observation",
@@ -173,6 +176,64 @@ def _update_bundle_manifest(bundle_path: Path, plan: dict[str, Any]) -> None:
         "selected_benchmark_id": plan["selected_registry_entries"]["benchmark_id"],
     }
     write_json(manifest_path, manifest)
+
+
+def _update_ara_handoff(bundle_path: Path, plan: dict[str, Any], run_id: str) -> None:
+    handoff_path = bundle_path / "artifacts" / "ara_handoff.json"
+    if not handoff_path.exists():
+        return
+    handoff = _load_json(handoff_path)
+    handoff["task_id"] = AGENT_TASK_ID
+    handoff["source_benchmark_task_id"] = LOCAL_TASK_ID
+    handoff["reproduce_command"] = f"{AGENT_COMMAND} --out <bundle>"
+    handoff.setdefault("dispatch", {})["entrypoint"] = AGENT_COMMAND
+    handoff["agent_smoke"] = {
+        "schema_version": "aira.ara_agent_handoff.v1",
+        "agent_schema_version": AGENT_SCHEMA_VERSION,
+        "task_id": AGENT_TASK_ID,
+        "run_id": run_id,
+        "loop": "plan-act-observe-reflect",
+        "selected_registry_entries": plan["selected_registry_entries"],
+        "artifacts": [
+            "artifacts/agent_plan.json",
+            "artifacts/agent_trace.json",
+            "artifacts/agent_observation.json",
+            "artifacts/agent_reflection.json",
+            "memory/agent_memory.json",
+            "memory/agent_memory.jsonl",
+        ],
+    }
+    required_inputs = handoff.setdefault("required_gate_inputs", {})
+    required_inputs.update(
+        {
+            "agent_plan": "artifacts/agent_plan.json",
+            "agent_trace": "artifacts/agent_trace.json",
+            "agent_observation": "artifacts/agent_observation.json",
+            "agent_reflection": "artifacts/agent_reflection.json",
+            "agent_memory": "memory/agent_memory.json",
+        }
+    )
+    write_json(handoff_path, handoff)
+
+    notes_path = bundle_path / "artifacts" / "reproducibility_notes.md"
+    if notes_path.exists():
+        notes = notes_path.read_text(encoding="utf-8").rstrip()
+        notes_path.write_text(
+            "\n".join(
+                [
+                    notes,
+                    "",
+                    "## Agent Smoke Handoff",
+                    "",
+                    f"- Agent task id: `{AGENT_TASK_ID}`.",
+                    f"- Reproduce the agent smoke with `{AGENT_COMMAND} --out <bundle>`.",
+                    "- The agent loop only selects the registered deterministic local benchmark.",
+                    "- The emitted bundle includes agent plan, trace, observation, reflection, and memory artifacts.",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
 
 
 def run_agent_smoke(output_dir: str | Path) -> dict[str, Any]:
@@ -312,6 +373,7 @@ def run_agent_smoke(output_dir: str | Path) -> dict[str, Any]:
     )
     _append_agent_claim(out)
     _update_bundle_manifest(out, plan)
+    _update_ara_handoff(out, plan, benchmark_payload["run_id"])
     final_validation = validate_bundle(out)
     return {
         "schema_version": "aira.agent_smoke.v1",

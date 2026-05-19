@@ -1,7 +1,7 @@
 {
   "kind": "aira.spec_tasks.v1",
   "project": "aira",
-  "updated_at": "2026-05-19T13:22:31Z",
+  "updated_at": "2026-05-19T14:01:46Z",
   "source_spec": "docs/aira_spec_governance.zh.md",
   "status_doc": "docs/aira_implementation_status.zh.md",
   "decision_log_dir": "docs/decisions",
@@ -44,7 +44,7 @@
     {
       "id": "REQ-AIRA-ARA-001",
       "title": "ARA-facing integration and reproducibility",
-      "status": "partial"
+      "status": "completed"
     }
   ],
   "tasks": [
@@ -215,12 +215,71 @@
     {
       "id": "AIRA-ARA-001",
       "title": "Prove ARA can consume AIRA bundles with reproducibility gates",
-      "status": "pending",
+      "status": "completed",
       "requirement_ids": [
         "REQ-AIRA-ARA-001"
       ],
-      "evidence": [],
-      "next_action": "Add cross-repo integration smoke and reproduction handoff contract."
+      "evidence": [
+        {
+          "kind": "command",
+          "value": "python3 -m aira agent smoke --out /tmp/aira_ara_agent_bundle --json"
+        },
+        {
+          "kind": "command",
+          "value": "python3 -m aira bundles validate /tmp/aira_ara_agent_bundle --json"
+        },
+        {
+          "kind": "test",
+          "value": "python3 -m pytest -q tests/test_experiment_bundle.py tests/test_bootstrap.py tests/test_local_benchmark.py"
+        },
+        {
+          "kind": "artifact",
+          "path": "aira/benchmark.py"
+        },
+        {
+          "kind": "artifact",
+          "path": "aira/bundles.py"
+        },
+        {
+          "kind": "artifact",
+          "path": "aira/agent.py"
+        },
+        {
+          "kind": "artifact",
+          "path": "research_lab.yaml"
+        },
+        {
+          "kind": "artifact",
+          "path": "docs/aira_implementation_status.zh.md"
+        },
+        {
+          "kind": "record",
+          "value": "task report: .engineering/reports/tasks/20260519T135443Z-AIRA-ARA-001.md",
+          "recorded_at": "2026-05-19T14:01:46Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task manifest: .engineering/reports/tasks/20260519T135443Z-AIRA-ARA-001.json",
+          "recorded_at": "2026-05-19T14:01:46Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task result: All required acceptance commands passed.",
+          "recorded_at": "2026-05-19T14:01:46Z",
+          "actor": "engineering-harness:auto"
+        }
+      ],
+      "remaining_limits": [
+        "The ARA handoff proof remains local to AIRA and does not edit the ARA repository.",
+        "The handoff profile covers deterministic local agent bundles without network datasets, GPU execution, live model APIs, or external services.",
+        "Future ARA contract changes may require updating the handoff profile and validator checks."
+      ],
+      "next_action": "Keep the ARA handoff profile synchronized with public ARA bundle and reproduction gate contract changes.",
+      "updated_at": "2026-05-19T14:01:46Z",
+      "last_note": "Recorded automatically after a completed harness task.",
+      "last_phase": "drive"
     }
   ]
 }

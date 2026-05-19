@@ -69,12 +69,20 @@ def test_write_local_benchmark_bundle_persists_provenance_and_run_ledger(tmp_pat
     ]
     assert payload["validation"]["metadata"]["run_ledger_entry_count"] == 1
     assert payload["validation"]["metadata"]["run_ledger_run_ids"] == [payload["run_id"]]
+    assert payload["validation"]["metadata"]["ara_gate"]["profile"] == "ara-public-bundle-reproduction-gate.v1"
+    assert payload["validation"]["metadata"]["ara_gate"]["handoff_artifacts"] == ["artifacts/ara_handoff.json"]
+    assert payload["validation"]["metadata"]["ara_gate"]["required_inputs_present"] is True
 
     provenance = json.loads((output / "artifacts" / "provenance.json").read_text(encoding="utf-8"))
+    ara_handoff = json.loads((output / "artifacts" / "ara_handoff.json").read_text(encoding="utf-8"))
     ledger_entry = json.loads((output / "artifacts" / "run_ledger_entry.json").read_text(encoding="utf-8"))
     ledger_lines = (output / "memory" / "run_ledger.jsonl").read_text(encoding="utf-8").splitlines()
 
     assert provenance["run_id"] == payload["run_id"]
+    assert ara_handoff["consumer"] == "ara"
+    assert ara_handoff["reproducibility"]["network_required"] is False
+    assert ara_handoff["required_gate_inputs"]["run_ledger"] == "memory/run_ledger.jsonl"
+    assert (output / "artifacts" / "reproducibility_notes.md").read_text(encoding="utf-8").strip()
     assert ledger_entry["run_id"] == payload["run_id"]
     assert ledger_entry["status"] == "passed"
     assert ledger_entry["reproducibility"]["live_model_calls"] is False
@@ -89,8 +97,9 @@ def test_local_benchmark_bundle_validates(tmp_path):
     result = validate_bundle(output)
 
     assert result.valid
-    assert result.metadata["artifact_count"] == 9
+    assert result.metadata["artifact_count"] == 11
     assert result.metadata["claim_count"] == 1
+    assert result.metadata["ara_gate"]["required_inputs_present"] is True
 
 
 def test_local_benchmark_cli_emits_json(tmp_path, capsys):
@@ -169,6 +178,8 @@ def test_agent_smoke_emits_valid_bundle_with_reusable_memory(tmp_path):
     assert agent_memory["entries"] == [payload["memory"]["entry"]]
     assert json.loads(agent_memory_lines[0]) == payload["memory"]["entry"]
     assert agent_trace["reflection"]["outcome"] == "accepted"
+    assert validation.metadata["ara_gate"]["profile"] == "ara-public-bundle-reproduction-gate.v1"
+    assert "artifacts/reproducibility_notes.md" in validation.metadata["ara_gate"]["reproducibility_note_artifacts"]
     assert {claim["claim_id"] for claim in claims["claims"]} >= {
         "aira-local-benchmark-c1",
         "aira-agent-smoke-c1",

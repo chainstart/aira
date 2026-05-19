@@ -46,6 +46,21 @@ artifacts:
 bundles:
   produced:
     - aira_result_bundle
+  handoff_profiles:
+    - profile: ara-public-bundle-reproduction-gate.v1
+      bundle_schema_version: ara.result_bundle.v1
+      validation_command: python3 -m aira bundles validate <bundle> --json
+      smoke_command: python3 -m aira agent smoke --out <bundle> --json
+      required_artifacts:
+        - bundle_manifest.json
+        - artifact_manifest.json
+        - claims.json
+        - artifacts/ara_handoff.json
+        - artifacts/reproducibility_notes.md
+        - artifacts/reproduction_status.json
+        - artifacts/provenance.json
+        - artifacts/run_ledger_entry.json
+        - memory/run_ledger.jsonl
 registries:
   datasets: aira/registries/datasets.json
   models: aira/registries/models.json

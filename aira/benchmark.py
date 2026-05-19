@@ -29,6 +29,9 @@ LOCAL_MODEL_ID = "deterministic-keyword-outcome-classifier-v1"
 LOCAL_BASELINE_ID = "deterministic-pass-prior-baseline-v1"
 LOCAL_TASK_ID = "AIRA-BENCHMARK-001"
 LOCAL_COMMAND = "python3 -m aira run-local-benchmark"
+ARA_HANDOFF_SCHEMA_VERSION = "aira.ara_handoff.v1"
+ARA_GATE_PROFILE = "ara-public-bundle-reproduction-gate.v1"
+ARA_VALIDATE_COMMAND = "python3 -m aira bundles validate <bundle> --json"
 
 LOCAL_DATASET_ROWS: list[dict[str, str]] = [
     {
@@ -254,6 +257,55 @@ def build_local_provenance() -> dict[str, Any]:
     }
 
 
+def build_ara_handoff(report: dict[str, Any], provenance: dict[str, Any]) -> dict[str, Any]:
+    """Describe the deterministic bundle inputs ARA reproduction gates can consume."""
+    return {
+        "schema_version": ARA_HANDOFF_SCHEMA_VERSION,
+        "consumer": "ara",
+        "gate_profile": ARA_GATE_PROFILE,
+        "bundle_schema_version": BUNDLE_SCHEMA_VERSION,
+        "bundle_type": "aira_result_bundle",
+        "producer": "aira",
+        "task_id": LOCAL_TASK_ID,
+        "run_id": report["run_id"],
+        "created_at": LOCAL_CREATED_AT,
+        "status": "ready",
+        "validation_command": ARA_VALIDATE_COMMAND,
+        "reproduce_command": f"{LOCAL_COMMAND} --out <bundle>",
+        "required_gate_inputs": {
+            "bundle_manifest": "bundle_manifest.json",
+            "artifact_manifest": "artifact_manifest.json",
+            "claims": "claims.json",
+            "writing_brief": "writing_brief.md",
+            "limitations": "limitations.md",
+            "reproducibility_notes": "artifacts/reproducibility_notes.md",
+            "reproduction_status": "artifacts/reproduction_status.json",
+            "provenance": "artifacts/provenance.json",
+            "run_ledger_entry": "artifacts/run_ledger_entry.json",
+            "run_ledger": "memory/run_ledger.jsonl",
+            "benchmark_report": "artifacts/benchmark_report.json",
+        },
+        "reproducibility": {
+            "deterministic": True,
+            "network_required": False,
+            "external_datasets_required": False,
+            "gpu_required": False,
+            "live_model_calls": False,
+            "input_fingerprints": provenance["input_fingerprints"],
+        },
+        "claim_gate": {
+            "confirmed_claims_require_reproduced_status": True,
+            "confirmed_claims_require_reproduction_artifact": True,
+        },
+        "dispatch": {
+            "lab_id": "aira",
+            "entrypoint": LOCAL_COMMAND,
+            "side_effect_free_validation": True,
+            "network_policy": "none",
+        },
+    }
+
+
 def evaluate_local_benchmark() -> dict[str, Any]:
     labels = [row["label"] for row in LOCAL_DATASET_ROWS]
     predictions = [keyword_outcome_predict(row["text"]) for row in LOCAL_DATASET_ROWS]
@@ -425,6 +477,29 @@ def _build_local_run_ledger_entry(
     }
 
 
+def _write_local_reproducibility_notes(path: Path, report: dict[str, Any], provenance: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            [
+                "# Reproducibility Notes",
+                "",
+                f"- Run id: `{report['run_id']}`.",
+                f"- Benchmark: `{LOCAL_BENCHMARK_ID}`.",
+                f"- Reproduce locally with `{LOCAL_COMMAND} --out <bundle>`.",
+                f"- Validate the emitted bundle with `{ARA_VALIDATE_COMMAND}`.",
+                f"- Dataset sha256: `{provenance['input_fingerprints']['dataset_sha256']}`.",
+                f"- Model config sha256: `{provenance['input_fingerprints']['model_config_sha256']}`.",
+                f"- Registry snapshot sha256: `{provenance['input_fingerprints']['registry_snapshot_sha256']}`.",
+                "- The benchmark is deterministic and uses only built-in local fixture data.",
+                "- No network dataset, live model API, GPU, training job, or external service is required.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def write_fixture_bundle(output_dir: str | Path) -> dict[str, Any]:
     out = Path(output_dir).expanduser().resolve()
     artifacts_dir = out / "artifacts"
@@ -562,6 +637,7 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
 
     report = evaluate_local_benchmark()
     provenance = build_local_provenance()
+    ara_handoff = build_ara_handoff(report, provenance)
     write_json(
         out / "bundle_manifest.json",
         {
@@ -580,10 +656,18 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
             "external_datasets_required": False,
             "gpu_required": False,
             "live_model_calls": False,
+            "ara_handoff": {
+                "schema_version": ARA_HANDOFF_SCHEMA_VERSION,
+                "gate_profile": ARA_GATE_PROFILE,
+                "artifact": "artifacts/ara_handoff.json",
+                "validation_command": ARA_VALIDATE_COMMAND,
+            },
         },
     )
     write_json(out / "artifacts" / "benchmark_report.json", report)
     write_json(out / "artifacts" / "provenance.json", provenance)
+    write_json(out / "artifacts" / "ara_handoff.json", ara_handoff)
+    _write_local_reproducibility_notes(out / "artifacts" / "reproducibility_notes.md", report, provenance)
     write_json(
         out / "artifacts" / "reproduction_status.json",
         {
@@ -623,6 +707,18 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
                     "path": "artifacts/provenance.json",
                     "kind": "provenance",
                     "description": "Input, execution, and reproducibility provenance for the local benchmark.",
+                },
+                {
+                    "artifact_id": "ara_handoff",
+                    "path": "artifacts/ara_handoff.json",
+                    "kind": "ara_handoff",
+                    "description": "ARA-facing bundle and reproduction gate handoff metadata.",
+                },
+                {
+                    "artifact_id": "reproducibility_notes",
+                    "path": "artifacts/reproducibility_notes.md",
+                    "kind": "reproducibility_notes",
+                    "description": "Human-readable deterministic reproduction notes for public ARA gates.",
                 },
                 {
                     "artifact_id": "reproduction_status",
@@ -687,6 +783,8 @@ def write_local_benchmark_bundle(output_dir: str | Path) -> dict[str, Any]:
                         "metrics_table",
                         "benchmark_report",
                         "provenance",
+                        "ara_handoff",
+                        "reproducibility_notes",
                         "run_ledger_entry",
                     ],
                     "limitations": provenance["limitations"],

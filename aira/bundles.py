@@ -10,6 +10,8 @@ from typing import Any
 
 BUNDLE_SCHEMA_VERSION = "ara.result_bundle.v1"
 VALIDATION_SCHEMA_VERSION = "aira.bundle_validation.v1"
+ARA_HANDOFF_SCHEMA_VERSION = "aira.ara_handoff.v1"
+ARA_GATE_PROFILE = "ara-public-bundle-reproduction-gate.v1"
 REQUIRED_FILES = [
     "bundle_manifest.json",
     "artifact_manifest.json",
@@ -349,6 +351,113 @@ def _validate_run_ledger_artifact(path: Path, source: str, errors: list[str]) ->
     return run_ids
 
 
+def _gate_input_path_refs(payload: Any, errors: list[str]) -> dict[str, str]:
+    if not isinstance(payload, dict):
+        errors.append("ara_handoff.required_gate_inputs must be an object.")
+        return {}
+    refs: dict[str, str] = {}
+    for key, value in payload.items():
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"ara_handoff.required_gate_inputs.{key} must be a non-empty string path.")
+            continue
+        if not _safe_relative_path(value):
+            errors.append(f"ara_handoff.required_gate_inputs.{key} must be a safe relative bundle path.")
+            continue
+        refs[key] = value.strip()
+    return refs
+
+
+def _validate_ara_handoff_artifact(
+    payload: Any,
+    *,
+    bundle_path: Path,
+    artifact_details: dict[str, dict[str, Any]],
+    errors: list[str],
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "profile": None,
+        "required_inputs": {},
+        "required_inputs_present": False,
+    }
+    if not isinstance(payload, dict):
+        errors.append("ara_handoff artifact must contain a JSON object.")
+        return metadata
+
+    for key in ("schema_version", "consumer", "gate_profile", "bundle_schema_version", "bundle_type", "run_id"):
+        _required_string(payload, key, "ara_handoff", errors)
+    if payload.get("schema_version") != ARA_HANDOFF_SCHEMA_VERSION:
+        errors.append(f"ara_handoff.schema_version must be `{ARA_HANDOFF_SCHEMA_VERSION}`.")
+    if payload.get("consumer") != "ara":
+        errors.append("ara_handoff.consumer must be `ara`.")
+    if payload.get("gate_profile") != ARA_GATE_PROFILE:
+        errors.append(f"ara_handoff.gate_profile must be `{ARA_GATE_PROFILE}`.")
+    if payload.get("bundle_schema_version") != BUNDLE_SCHEMA_VERSION:
+        errors.append(f"ara_handoff.bundle_schema_version must be `{BUNDLE_SCHEMA_VERSION}`.")
+    if payload.get("bundle_type") != "aira_result_bundle":
+        errors.append("ara_handoff.bundle_type must be `aira_result_bundle`.")
+    if payload.get("status") != "ready":
+        errors.append("ara_handoff.status must be `ready`.")
+
+    reproducibility = payload.get("reproducibility")
+    if not isinstance(reproducibility, dict):
+        errors.append("ara_handoff.reproducibility must be an object.")
+    else:
+        if reproducibility.get("deterministic") is not True:
+            errors.append("ara_handoff.reproducibility.deterministic must be true.")
+        for key in ("network_required", "external_datasets_required", "gpu_required", "live_model_calls"):
+            _validate_false_flag(reproducibility, key, "ara_handoff.reproducibility", errors)
+        fingerprints = reproducibility.get("input_fingerprints")
+        if not isinstance(fingerprints, dict):
+            errors.append("ara_handoff.reproducibility.input_fingerprints must be an object.")
+        else:
+            for key in ("dataset_sha256", "model_config_sha256", "registry_snapshot_sha256"):
+                if not _is_sha256(fingerprints.get(key)):
+                    errors.append(f"ara_handoff.reproducibility.input_fingerprints.{key} must be a sha256 hex digest.")
+
+    claim_gate = payload.get("claim_gate")
+    if not isinstance(claim_gate, dict):
+        errors.append("ara_handoff.claim_gate must be an object.")
+    else:
+        for key in ("confirmed_claims_require_reproduced_status", "confirmed_claims_require_reproduction_artifact"):
+            if claim_gate.get(key) is not True:
+                errors.append(f"ara_handoff.claim_gate.{key} must be true.")
+
+    required_inputs = _gate_input_path_refs(payload.get("required_gate_inputs"), errors)
+    expected_inputs = {
+        "bundle_manifest",
+        "artifact_manifest",
+        "claims",
+        "writing_brief",
+        "limitations",
+        "reproducibility_notes",
+        "reproduction_status",
+        "provenance",
+        "run_ledger_entry",
+        "run_ledger",
+    }
+    missing_keys = sorted(expected_inputs - set(required_inputs))
+    if missing_keys:
+        errors.append(f"ara_handoff.required_gate_inputs is missing keys: {missing_keys}.")
+    declared_paths = {detail["path"] for detail in artifact_details.values() if isinstance(detail.get("path"), str)}
+    allowed_paths = set(REQUIRED_FILES) | declared_paths
+    missing_paths = sorted(value for value in required_inputs.values() if value not in allowed_paths)
+    if missing_paths:
+        errors.append(f"ara_handoff.required_gate_inputs references undeclared bundle paths: {missing_paths}.")
+    missing_file_keys: list[str] = []
+    for key, relative in required_inputs.items():
+        candidate = bundle_path / relative
+        if not candidate.is_file():
+            missing_file_keys.append(key)
+            errors.append(f"ara_handoff.required_gate_inputs.{key} does not point to a bundle file: {relative}")
+
+    metadata["profile"] = payload.get("gate_profile")
+    metadata["required_inputs"] = required_inputs
+    metadata["missing_required_input_keys"] = missing_keys
+    metadata["missing_required_input_files"] = sorted(missing_file_keys)
+    metadata["required_inputs_present"] = not missing_keys and not missing_paths and not missing_file_keys
+    return metadata
+
+
 def validate_bundle(bundle_path: str | Path) -> BundleValidationResult:
     path = Path(bundle_path).expanduser().resolve()
     errors: list[str] = []
@@ -359,6 +468,7 @@ def validate_bundle(bundle_path: str | Path) -> BundleValidationResult:
     bundle_type: str | None = None
     artifact_ids: set[str] = set()
     artifact_details: dict[str, dict[str, Any]] = {}
+    manifest_declares_ara_handoff = False
 
     if not path.exists():
         _check(checks, "bundle_path", "fail", "Bundle path does not exist.")
@@ -393,6 +503,21 @@ def validate_bundle(bundle_path: str | Path) -> BundleValidationResult:
                 errors.append("bundle_manifest.json field `bundle_type` must be `aira_result_bundle`.")
             if domain != "ai_ml":
                 errors.append("bundle_manifest.json field `domain` must be `ai_ml`.")
+            ara_handoff = manifest.get("ara_handoff")
+            if ara_handoff is not None:
+                manifest_declares_ara_handoff = True
+                if not isinstance(ara_handoff, dict):
+                    errors.append("bundle_manifest.json field `ara_handoff` must be an object when present.")
+                else:
+                    if ara_handoff.get("schema_version") != ARA_HANDOFF_SCHEMA_VERSION:
+                        errors.append(
+                            f"bundle_manifest.json ara_handoff.schema_version must be `{ARA_HANDOFF_SCHEMA_VERSION}`."
+                        )
+                    if ara_handoff.get("gate_profile") != ARA_GATE_PROFILE:
+                        errors.append(f"bundle_manifest.json ara_handoff.gate_profile must be `{ARA_GATE_PROFILE}`.")
+                    artifact = ara_handoff.get("artifact")
+                    if not isinstance(artifact, str) or not _safe_relative_path(artifact):
+                        errors.append("bundle_manifest.json ara_handoff.artifact must be a safe relative path.")
             metadata["bundle_manifest"] = manifest
             metadata["domain"] = domain or None
             metadata["created_at"] = created_at or None
@@ -460,6 +585,46 @@ def validate_bundle(bundle_path: str | Path) -> BundleValidationResult:
                 "run_ledger_artifacts",
                 "pass" if len(errors) == before else "fail",
                 "Run ledger artifacts contain machine-readable experiment memory entries.",
+            )
+        ara_handoff_paths = _artifact_paths_for(
+            artifact_details,
+            artifact_ids={"ara_handoff"},
+            kinds={"ara_handoff"},
+        )
+        reproducibility_note_paths = _artifact_paths_for(
+            artifact_details,
+            artifact_ids={"reproducibility_notes"},
+            kinds={"reproducibility_notes"},
+        )
+        if manifest_declares_ara_handoff or ara_handoff_paths:
+            before = len(errors)
+            if not ara_handoff_paths:
+                errors.append("ARA handoff bundles must declare an ara_handoff artifact.")
+            if not reproducibility_note_paths:
+                errors.append("ARA handoff bundles must declare reproducibility_notes artifacts.")
+            ara_gate_metadata: dict[str, Any] = {
+                "profile": None,
+                "handoff_artifacts": ara_handoff_paths,
+                "reproducibility_note_artifacts": reproducibility_note_paths,
+            }
+            for relative in ara_handoff_paths:
+                ara_gate_metadata.update(
+                    _validate_ara_handoff_artifact(
+                        _read_json(path / relative, errors),
+                        bundle_path=path,
+                        artifact_details=artifact_details,
+                        errors=errors,
+                    )
+                )
+            for relative in reproducibility_note_paths:
+                if not (path / relative).read_text(encoding="utf-8").strip():
+                    errors.append(f"{relative} must contain non-empty ARA reproducibility notes.")
+            metadata["ara_gate"] = ara_gate_metadata
+            _check(
+                checks,
+                "ara_handoff",
+                "pass" if len(errors) == before else "fail",
+                "ARA handoff metadata declares bundle, reproduction, claim, and run ledger gate inputs.",
             )
 
     claims_path = path / "claims.json"

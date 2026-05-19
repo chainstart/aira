@@ -46,6 +46,7 @@ class LabManifest:
         safety = _mapping(self.raw.get("safety"))
         registries = _mapping(self.raw.get("registries"))
         legacy = _mapping(self.raw.get("legacy"))
+        bundles = _mapping(self.raw.get("bundles"))
         return {
             "schema_version": SCHEMA_VERSION,
             "path": str(self.path),
@@ -71,6 +72,9 @@ class LabManifest:
                 "exclude": _string_list(artifacts.get("exclude")),
             },
             "bundle_types": self.bundle_types,
+            "bundle_handoff_profiles": bundles.get("handoff_profiles")
+            if isinstance(bundles.get("handoff_profiles"), list)
+            else [],
             "registries": dict(registries),
             "safety": dict(safety),
             "valid": self.validation.valid,
