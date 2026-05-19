@@ -14,3 +14,16 @@ provides a deterministic bootstrap contract:
 The initial registries are placeholders for datasets, models, and benchmarks.
 They are intentionally local and fixture-backed until real AI experiment runners
 are migrated behind the same bundle contract.
+
+## Spec Governance
+
+AIRA tracks its implementation status through a dynamic spec maintenance system:
+
+- `docs/aira_spec_governance.zh.md` describes the current AIRA requirements.
+- `docs/aira_implementation_status.zh.md` records implementation status and gaps.
+- `.engineering/spec_tasks.yaml` is the machine-readable task ledger used by
+  Engineering Harness.
+- `docs/decisions/` stores architecture decisions.
+
+After each harness task or development stage, update the task ledger with the
+implemented requirement, evidence command, artifact path, and remaining blocker.

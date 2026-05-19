@@ -1,0 +1,68 @@
+{
+  "kind": "aira.spec_tasks.v1",
+  "project": "aira",
+  "updated_at": "2026-05-19T00:00:00Z",
+  "source_spec": "docs/aira_spec_governance.zh.md",
+  "status_doc": "docs/aira_implementation_status.zh.md",
+  "decision_log_dir": "docs/decisions",
+  "requirements": [
+    {"id": "REQ-AIRA-GOV-001", "title": "Dynamic spec governance", "status": "completed"},
+    {"id": "REQ-AIRA-MANIFEST-001", "title": "ARA-compatible lab manifest and CLI", "status": "completed"},
+    {"id": "REQ-AIRA-REGISTRY-001", "title": "Dataset, model, and benchmark registries", "status": "partial"},
+    {"id": "REQ-AIRA-BENCHMARK-001", "title": "Fixture and real benchmark runners", "status": "partial"},
+    {"id": "REQ-AIRA-BUNDLE-001", "title": "AIRA result bundle contract", "status": "completed"},
+    {"id": "REQ-AIRA-AGENT-001", "title": "AI experiment agent loop", "status": "pending"},
+    {"id": "REQ-AIRA-MEMORY-001", "title": "Experiment memory and run ledger", "status": "pending"},
+    {"id": "REQ-AIRA-ARA-001", "title": "ARA-facing integration and reproducibility", "status": "partial"}
+  ],
+  "tasks": [
+    {
+      "id": "AIRA-SPEC-GOV-001",
+      "title": "Install AIRA dynamic spec governance files",
+      "status": "completed",
+      "requirement_ids": ["REQ-AIRA-GOV-001"],
+      "evidence": [
+        {"kind": "doc", "path": "docs/aira_spec_governance.zh.md"},
+        {"kind": "doc", "path": "docs/aira_implementation_status.zh.md"},
+        {"kind": "doc", "path": "docs/decisions/2026-05-19-spec-governance.zh.md"}
+      ],
+      "next_action": "Use engineering-harness spec-sync after each AIRA task or stage."
+    },
+    {
+      "id": "AIRA-MANIFEST-001",
+      "title": "Keep AIRA manifest and bundle smoke current",
+      "status": "completed",
+      "requirement_ids": ["REQ-AIRA-MANIFEST-001", "REQ-AIRA-BUNDLE-001"],
+      "evidence": [
+        {"kind": "command", "value": "python3 -m aira labs inspect --json"},
+        {"kind": "command", "value": "python3 -m aira bundles validate tests/fixtures/aira_result_bundle --json"},
+        {"kind": "test", "value": "python3 -m pytest -q"}
+      ],
+      "next_action": "Update whenever ARA lab or result bundle contracts change."
+    },
+    {
+      "id": "AIRA-BENCHMARK-001",
+      "title": "Move beyond fixture benchmark to real AI experiment runners",
+      "status": "pending",
+      "requirement_ids": ["REQ-AIRA-REGISTRY-001", "REQ-AIRA-BENCHMARK-001", "REQ-AIRA-MEMORY-001"],
+      "evidence": [],
+      "next_action": "Add a small deterministic real benchmark runner with provenance and reproducibility notes."
+    },
+    {
+      "id": "AIRA-AGENT-001",
+      "title": "Implement AI experiment agent MVP",
+      "status": "pending",
+      "requirement_ids": ["REQ-AIRA-AGENT-001", "REQ-AIRA-MEMORY-001"],
+      "evidence": [],
+      "next_action": "Design tool registry, run ledger, and guarded experiment execution loop."
+    },
+    {
+      "id": "AIRA-ARA-001",
+      "title": "Prove ARA can consume AIRA bundles with reproducibility gates",
+      "status": "pending",
+      "requirement_ids": ["REQ-AIRA-ARA-001"],
+      "evidence": [],
+      "next_action": "Add cross-repo integration smoke and reproduction handoff contract."
+    }
+  ]
+}
