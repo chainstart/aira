@@ -314,6 +314,232 @@ milestones:
       command: python3 -c "import sys; sys.path.insert(0, '/home/biostar/work/projects/engineering-harness/src'); from engineering_harness.cli import main; raise SystemExit(main(['spec-sync', 'audit', '--project-root', '.', '--json']))" >/tmp/aira_spec_sync_audit.json
       required: true
       timeout_seconds: 120
+- id: aira-production-ai-migration
+  title: AIRA Production AI Experiment Migration
+  status: active
+  objective: Move the old ARA production AI/ML experiment execution capability into AIRA as explicit production-local profiles while keeping deterministic smoke/local CI paths stable.
+  tasks:
+  - id: AIRA-PROD-RUNNER-001
+    title: Port legacy ARA ExperimentAgent and CodeExecutor into a bounded AIRA production runner
+    status: completed
+    max_attempts: 2
+    max_task_iterations: 3
+    manual_approval_required: false
+    file_scope:
+    - aira/**
+    - tests/**
+    - docs/**
+    - research_lab.yaml
+    - .engineering/spec_tasks.yaml
+    - .engineering/roadmap.yaml
+    implementation:
+    - name: codex implements AIRA production runner
+      executor: codex
+      timeout_seconds: 7200
+      no_progress_timeout_seconds: 1200
+      requested_capabilities:
+      - agent
+      prompt: Implement AIRA-PROD-RUNNER-001. Port the useful legacy ARA ExperimentAgent/CodeExecutor responsibilities into AIRA as a bounded production-local runner. Keep default smoke/local execution deterministic. Add explicit profile gating, policy checks, resource limits, failure isolation, script/package controls, artifact materialization, focused tests, docs and spec tracking.
+    acceptance:
+    - name: AIRA legacy AI inventory still works
+      command: python3 -m aira migrate inventory --source ../ara --json >/tmp/aira_migration_inventory.json
+      required: true
+      timeout_seconds: 180
+    - name: AIRA production-local runner emits bundle
+      command: python3 -m aira experiments run --profile production-local --plan tests/fixtures/production_plan.json --out /tmp/aira_prod_runner_bundle --json >/tmp/aira_prod_runner.json
+      required: true
+      timeout_seconds: 600
+    - name: AIRA production runner tests pass
+      command: python3 -m pytest -q tests/test_production_runner.py tests/test_migration_inventory.py
+      required: true
+      timeout_seconds: 900
+    evidence:
+    - kind: artifact
+      path: aira/production_runner.py
+    - kind: artifact
+      path: tests/fixtures/production_plan.json
+    - kind: command
+      value: python3 -m aira experiments run --profile production-local --plan tests/fixtures/production_plan.json --out /tmp/aira_prod_runner_bundle --json
+    remaining_limits:
+    - Only the explicit production-local profile is enabled.
+    - Package installation, network access, GPU execution, external datasets, and live model APIs remain disabled.
+    - Subprocess timeout/resource controls are local process bounds, not container isolation.
+  - id: AIRA-PROD-REGISTRY-001
+    title: Build production dataset and model registry adapters
+    status: completed
+    max_attempts: 2
+    max_task_iterations: 3
+    manual_approval_required: false
+    depends_on:
+    - AIRA-PROD-RUNNER-001
+    file_scope:
+    - aira/**
+    - tests/**
+    - docs/**
+    - research_lab.yaml
+    - .engineering/spec_tasks.yaml
+    - .engineering/roadmap.yaml
+    implementation:
+    - name: codex implements AIRA production registry
+      executor: codex
+      timeout_seconds: 5400
+      no_progress_timeout_seconds: 900
+      requested_capabilities:
+      - agent
+      prompt: Implement AIRA-PROD-REGISTRY-001. Extend dataset/model/benchmark registries for production-local experiments, including local cache, operator-supplied artifacts, optional external adapters, fingerprints, versioning, license/resource policy and reproducibility notes. Preserve fixture/local registry behavior.
+    acceptance:
+    - name: AIRA production registry audit passes
+      command: python3 -m aira registry audit --profile production-local --json >/tmp/aira_prod_registry_audit.json
+      required: true
+      timeout_seconds: 300
+    - name: AIRA production registry tests pass
+      command: python3 -m pytest -q tests/test_registry.py tests/test_production_registry.py
+      required: true
+      timeout_seconds: 900
+    evidence:
+    - kind: command
+      value: python3 -m aira registry audit --profile production-local --json
+    - kind: command
+      value: python3 -m pytest -q tests/test_registry.py tests/test_production_registry.py
+    remaining_limits:
+    - Optional external adapters are registered as disabled templates only.
+    - Network datasets, GPU execution, live model APIs, package installation, and external model downloads remain disabled.
+    - Operator-supplied artifact licensing and redistribution are represented as operator attestations.
+  - id: AIRA-PROD-EVAL-001
+    title: Port production evaluation, ablation, error analysis, and statistical testing
+    status: completed
+    max_attempts: 2
+    max_task_iterations: 3
+    manual_approval_required: false
+    depends_on:
+    - AIRA-PROD-RUNNER-001
+    - AIRA-PROD-REGISTRY-001
+    file_scope:
+    - aira/**
+    - tests/**
+    - docs/**
+    - .engineering/spec_tasks.yaml
+    - .engineering/roadmap.yaml
+    implementation:
+    - name: codex implements AIRA production evaluation
+      executor: codex
+      timeout_seconds: 5400
+      no_progress_timeout_seconds: 900
+      requested_capabilities:
+      - agent
+      prompt: >-
+        Implement AIRA-PROD-EVAL-001. Port the old ARA statistical testing and
+        experiment comparison duties into AIRA production bundle artifacts:
+        metrics, ablation matrix, error taxonomy, statistical tests and report
+        summaries. Keep schemas machine-readable and reproducible.
+    acceptance:
+    - name: AIRA production evaluation passes
+      command: python3 -m aira experiments evaluate --bundle /tmp/aira_prod_runner_bundle --json >/tmp/aira_prod_eval.json
+      required: true
+      timeout_seconds: 300
+    - name: AIRA production evaluation tests pass
+      command: python3 -m pytest -q tests/test_production_evaluation.py tests/test_local_benchmark.py
+      required: true
+      timeout_seconds: 900
+    evidence:
+    - kind: command
+      value: python3 -m aira experiments evaluate --bundle /tmp/aira_prod_runner_bundle --json
+    - kind: command
+      value: python3 -m pytest -q tests/test_production_evaluation.py tests/test_local_benchmark.py
+    - kind: file
+      path: aira/production_evaluation.py
+    - kind: file
+      path: tests/test_production_evaluation.py
+    remaining_limits:
+    - The production-local evaluator consumes materialized bundle prediction CSV artifacts only.
+    - The ablation matrix disables deterministic failure-keyword behavior; it does not retrain or call live models.
+    - Exact paired statistical tests are reproducible but low-powered on tiny local fixtures.
+  - id: AIRA-PROD-MEMORY-001
+    title: Build cross-run experiment memory and failure ledger
+    status: completed
+    max_attempts: 2
+    max_task_iterations: 3
+    manual_approval_required: false
+    depends_on:
+    - AIRA-PROD-RUNNER-001
+    - AIRA-PROD-EVAL-001
+    file_scope:
+    - aira/**
+    - tests/**
+    - docs/**
+    - .engineering/spec_tasks.yaml
+    - .engineering/roadmap.yaml
+    implementation:
+    - name: codex implements AIRA production memory
+      executor: codex
+      timeout_seconds: 5400
+      no_progress_timeout_seconds: 900
+      requested_capabilities:
+      - agent
+      prompt: Implement AIRA-PROD-MEMORY-001. Promote bundle-local experiment memory into a reusable local cross-run index with failures, fingerprints, model/dataset outcomes and agent reflection retrieval. Add lifecycle controls and tests.
+    acceptance:
+    - name: AIRA production memory index builds
+      command: python3 -m aira memory index --runs /tmp/aira_prod_runner_bundle --out /tmp/aira_prod_memory --json >/tmp/aira_prod_memory.json
+      required: true
+      timeout_seconds: 300
+    - name: AIRA production memory tests pass
+      command: python3 -m pytest -q tests/test_experiment_memory.py tests/test_production_memory.py
+      required: true
+      timeout_seconds: 900
+    evidence:
+    - kind: command
+      value: python3 -m aira memory index --runs /tmp/aira_prod_runner_bundle --out /tmp/aira_prod_memory --json
+    - kind: command
+      value: python3 -m pytest -q tests/test_experiment_memory.py tests/test_production_memory.py
+    - kind: file
+      path: aira/memory.py
+    - kind: file
+      path: tests/test_experiment_memory.py
+    - kind: file
+      path: tests/test_production_memory.py
+    remaining_limits:
+    - The memory index is a local file index, not a shared service or remote database.
+    - Lifecycle controls are rebuild/status/max-run filters; automated expiry and retry execution remain future work.
+    - Agent reflection retrieval consumes bundle artifacts and does not yet plan new experiments automatically.
+  - id: AIRA-PROD-ARA-001
+    title: Publish ARA production handoff profile for AIRA production bundles
+    status: completed
+    max_attempts: 2
+    max_task_iterations: 3
+    manual_approval_required: false
+    depends_on:
+    - AIRA-PROD-RUNNER-001
+    - AIRA-PROD-REGISTRY-001
+    - AIRA-PROD-EVAL-001
+    - AIRA-PROD-MEMORY-001
+    file_scope:
+    - aira/**
+    - tests/**
+    - docs/**
+    - research_lab.yaml
+    - .engineering/spec_tasks.yaml
+    - .engineering/roadmap.yaml
+    implementation:
+    - name: codex implements AIRA production ARA handoff
+      executor: codex
+      timeout_seconds: 5400
+      no_progress_timeout_seconds: 900
+      requested_capabilities:
+      - agent
+      prompt: Implement AIRA-PROD-ARA-001. Add production-local dispatch metadata and bundle validation profile so public ARA can consume AIRA production experiment outputs through research_lab.yaml and aira_result_bundle only. Preserve existing local agent smoke handoff.
+    acceptance:
+    - name: AIRA production agent smoke emits bundle
+      command: python3 -m aira agent production-smoke --out /tmp/aira_prod_agent_bundle --json >/tmp/aira_prod_agent.json
+      required: true
+      timeout_seconds: 600
+    - name: AIRA production ARA bundle validates
+      command: python3 -m aira bundles validate /tmp/aira_prod_agent_bundle --profile ara-production --json >/tmp/aira_prod_validate.json
+      required: true
+      timeout_seconds: 300
+    - name: AIRA production ARA handoff tests pass
+      command: python3 -m pytest -q tests/test_experiment_bundle.py tests/test_production_ara_handoff.py
+      required: true
+      timeout_seconds: 900
 profile: python-agent
 project: aira
 report_dir: .engineering/reports/tasks

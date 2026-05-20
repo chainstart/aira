@@ -47,6 +47,7 @@ class LabManifest:
         registries = _mapping(self.raw.get("registries"))
         legacy = _mapping(self.raw.get("legacy"))
         bundles = _mapping(self.raw.get("bundles"))
+        profiles = _mapping(self.raw.get("profiles"))
         return {
             "schema_version": SCHEMA_VERSION,
             "path": str(self.path),
@@ -76,6 +77,7 @@ class LabManifest:
             if isinstance(bundles.get("handoff_profiles"), list)
             else [],
             "registries": dict(registries),
+            "profiles": dict(profiles),
             "safety": dict(safety),
             "valid": self.validation.valid,
             "errors": list(self.validation.errors),

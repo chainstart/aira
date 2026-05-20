@@ -47,6 +47,74 @@
       "name": "AIRA deterministic local text outcome benchmark",
       "network_required": false,
       "status": "local_deterministic"
+    },
+    {
+      "adapter": {
+        "enabled": true,
+        "entrypoint": "python3 -m aira experiments run --profile production-local",
+        "network_required": false,
+        "type": "production_local_runner"
+      },
+      "dataset_id": "operator-supplied-production-plan",
+      "emits_artifact_kinds": [
+        "production_plan",
+        "policy_report",
+        "execution_trace",
+        "task_summary",
+        "provenance",
+        "reproduction_status",
+        "run_ledger"
+      ],
+      "emits_bundle_type": "aira_result_bundle",
+      "entrypoint": "python3 -m aira experiments run --profile production-local",
+      "external_datasets_required": false,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "material": "benchmark:production-local-plan-execution:1.0.0",
+        "value": "4483c5bf48ad4660065aae8d3c3e3c8f1acff5e8bb90c4b3a89cdc1fd7b38412"
+      },
+      "gpu_required": false,
+      "id": "production-local-plan-execution",
+      "license_policy": {
+        "default_license": "operator_supplied",
+        "redistribution_allowed": "operator_defined",
+        "requires_operator_attestation": true
+      },
+      "live_model_calls": false,
+      "metric_ids": [
+        "task_count",
+        "passed_task_count",
+        "failed_task_count",
+        "skipped_task_count"
+      ],
+      "model_ids": [
+        "production-local-controlled-python-runner-v1",
+        "operator-supplied-model-artifact-v1",
+        "production-local-model-cache-v1"
+      ],
+      "name": "AIRA production-local plan execution benchmark",
+      "network_required": false,
+      "profile": "production-local",
+      "reproducibility_notes": [
+        "The benchmark is reproducible from the production plan, profile policy, materialized task artifacts, and fingerprints.",
+        "External dataset and model adapters remain disabled under production-local."
+      ],
+      "resource_policy": {
+        "external_datasets_required": false,
+        "gpu_required": false,
+        "live_model_calls": false,
+        "max_cpu_threads": 2,
+        "max_task_timeout_seconds": 30,
+        "network_required": false,
+        "package_installation": false
+      },
+      "status": "production_local",
+      "version": "1.0.0",
+      "versioning": {
+        "change_policy": "Plan schema, profile policy, or emitted artifact contract changes require a new fingerprint.",
+        "scheme": "semver",
+        "stability": "profile pinned"
+      }
     }
   ],
   "schema_version": "aira.benchmark_registry.v1"

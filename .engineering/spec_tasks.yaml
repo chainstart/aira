@@ -1,7 +1,7 @@
 {
   "kind": "aira.spec_tasks.v1",
   "project": "aira",
-  "updated_at": "2026-05-19T14:29:55Z",
+  "updated_at": "2026-05-20T07:52:24Z",
   "source_spec": "docs/aira_spec_governance.zh.md",
   "status_doc": "docs/aira_implementation_status.zh.md",
   "decision_log_dir": "docs/decisions",
@@ -45,6 +45,31 @@
       "id": "REQ-AIRA-ARA-001",
       "title": "ARA-facing integration and reproducibility",
       "status": "completed"
+    },
+    {
+      "id": "REQ-AIRA-PROD-RUNNER-001",
+      "title": "Production AI experiment runner migrated from legacy ARA",
+      "status": "completed"
+    },
+    {
+      "id": "REQ-AIRA-PROD-REGISTRY-001",
+      "title": "Production dataset and model registry",
+      "status": "completed"
+    },
+    {
+      "id": "REQ-AIRA-PROD-EVAL-001",
+      "title": "Production evaluation, ablation, error analysis, and statistical testing",
+      "status": "completed"
+    },
+    {
+      "id": "REQ-AIRA-PROD-MEMORY-001",
+      "title": "Cross-run experiment memory and failure ledger",
+      "status": "not_started"
+    },
+    {
+      "id": "REQ-AIRA-PROD-ARA-001",
+      "title": "ARA production handoff profile",
+      "status": "not_started"
     }
   ],
   "tasks": [
@@ -349,6 +374,375 @@
       "updated_at": "2026-05-19T14:29:55Z",
       "last_note": "Recorded automatically after a completed harness task.",
       "last_phase": "drive"
+    },
+    {
+      "id": "AIRA-PROD-RUNNER-001",
+      "title": "Port legacy ARA ExperimentAgent and CodeExecutor into a bounded AIRA production runner",
+      "status": "completed",
+      "requirement_ids": [
+        "REQ-AIRA-PROD-RUNNER-001"
+      ],
+      "priority": "high",
+      "owner": "aira",
+      "depends_on": [],
+      "acceptance": [
+        {
+          "command": "python3 -m aira migrate inventory --source ../ara --json",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        },
+        {
+          "command": "python3 -m aira experiments run --profile production-local --plan tests/fixtures/production_plan.json --out /tmp/aira_prod_runner_bundle --json",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        },
+        {
+          "command": "python3 -m pytest -q tests/test_production_runner.py tests/test_migration_inventory.py",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        }
+      ],
+      "notes": "Migrate the useful legacy ARA experiment execution boundary into AIRA, not the ARA platform. The runner must be explicit-profile, local-first, policy checked, resource bounded, failure isolated, and artifact-producing.",
+      "evidence": [
+        {
+          "kind": "command",
+          "value": "python3 -m aira migrate inventory --source ../ara --json"
+        },
+        {
+          "kind": "command",
+          "value": "python3 -m aira experiments run --profile production-local --plan tests/fixtures/production_plan.json --out /tmp/aira_prod_runner_bundle --json"
+        },
+        {
+          "kind": "test",
+          "value": "python3 -m pytest -q tests/test_production_runner.py tests/test_migration_inventory.py"
+        },
+        {
+          "kind": "artifact",
+          "path": "aira/production_runner.py"
+        },
+        {
+          "kind": "artifact",
+          "path": "tests/fixtures/production_plan.json"
+        },
+        {
+          "kind": "artifact",
+          "path": "docs/aira_implementation_status.zh.md"
+        },
+        {
+          "kind": "record",
+          "value": "task report: .engineering/reports/tasks/20260520T065323Z-AIRA-PROD-RUNNER-001.md",
+          "recorded_at": "2026-05-20T07:08:38Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task manifest: .engineering/reports/tasks/20260520T065323Z-AIRA-PROD-RUNNER-001.json",
+          "recorded_at": "2026-05-20T07:08:38Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task result: All required acceptance commands passed.",
+          "recorded_at": "2026-05-20T07:08:38Z",
+          "actor": "engineering-harness:auto"
+        }
+      ],
+      "remaining_limits": [
+        "Only the explicit production-local profile is enabled.",
+        "The runner executes local inline Python tasks with subprocess timeouts, not container isolation.",
+        "Package installation, network access, GPU execution, external datasets, and live model APIs remain disabled."
+      ],
+      "next_action": "Build production registry adapters and production evaluation artifacts on top of the bounded runner.",
+      "updated_at": "2026-05-20T07:08:38Z",
+      "last_note": "Recorded automatically after a completed harness task.",
+      "last_phase": "run"
+    },
+    {
+      "id": "AIRA-PROD-REGISTRY-001",
+      "title": "Build production dataset and model registry adapters",
+      "status": "completed",
+      "requirement_ids": [
+        "REQ-AIRA-REGISTRY-001",
+        "REQ-AIRA-PROD-REGISTRY-001"
+      ],
+      "priority": "high",
+      "owner": "aira",
+      "depends_on": [
+        "AIRA-PROD-RUNNER-001"
+      ],
+      "acceptance": [
+        {
+          "command": "python3 -m aira registry audit --profile production-local --json",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        },
+        {
+          "command": "python3 -m pytest -q tests/test_registry.py tests/test_production_registry.py",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        }
+      ],
+      "notes": "Extended the current built-in registry with production entries for local cache, operator-supplied artifacts and optional external dataset/model adapters. Every production-local entry records fingerprint, version, license/resource policy and reproducibility notes.",
+      "evidence": [
+        {
+          "kind": "command",
+          "value": "python3 -m aira registry audit --profile production-local --json"
+        },
+        {
+          "kind": "command",
+          "value": "python3 -m pytest -q tests/test_registry.py tests/test_production_registry.py"
+        },
+        {
+          "kind": "file",
+          "path": "aira/registries.py"
+        },
+        {
+          "kind": "file",
+          "path": "aira/registries/datasets.json"
+        },
+        {
+          "kind": "file",
+          "path": "aira/registries/models.json"
+        },
+        {
+          "kind": "file",
+          "path": "aira/registries/benchmarks.json"
+        },
+        {
+          "kind": "record",
+          "value": "task report: .engineering/reports/tasks/20260520T071119Z-AIRA-PROD-REGISTRY-001.md",
+          "recorded_at": "2026-05-20T07:23:02Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task manifest: .engineering/reports/tasks/20260520T071119Z-AIRA-PROD-REGISTRY-001.json",
+          "recorded_at": "2026-05-20T07:23:02Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task result: All required acceptance commands passed.",
+          "recorded_at": "2026-05-20T07:23:02Z",
+          "actor": "engineering-harness:auto"
+        }
+      ],
+      "remaining_limits": [
+        "Optional external dataset/model adapters are registered as disabled templates only.",
+        "No network datasets, GPU execution, live model APIs, package installation, or external model downloads are enabled.",
+        "Operator-supplied artifact licensing and redistribution remain operator-attested metadata."
+      ],
+      "next_action": "Build production evaluation, ablation, error-analysis, and statistical testing artifacts on top of the production-local registry and runner.",
+      "updated_at": "2026-05-20T07:23:02Z",
+      "last_note": "Recorded automatically after a completed harness task.",
+      "last_phase": "run"
+    },
+    {
+      "id": "AIRA-PROD-EVAL-001",
+      "title": "Port production evaluation, ablation, error analysis, and statistical testing",
+      "status": "completed",
+      "requirement_ids": [
+        "REQ-AIRA-PROD-EVAL-001"
+      ],
+      "priority": "high",
+      "owner": "aira",
+      "depends_on": [
+        "AIRA-PROD-RUNNER-001",
+        "AIRA-PROD-REGISTRY-001"
+      ],
+      "acceptance": [
+        {
+          "command": "python3 -m aira experiments evaluate --bundle /tmp/aira_prod_runner_bundle --json",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        },
+        {
+          "command": "python3 -m pytest -q tests/test_production_evaluation.py tests/test_local_benchmark.py",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "command",
+          "value": "python3 -m aira experiments evaluate --bundle /tmp/aira_prod_runner_bundle --json"
+        },
+        {
+          "kind": "command",
+          "value": "python3 -m pytest -q tests/test_production_evaluation.py tests/test_local_benchmark.py"
+        },
+        {
+          "kind": "file",
+          "path": "aira/production_evaluation.py"
+        },
+        {
+          "kind": "file",
+          "path": "tests/test_production_evaluation.py"
+        },
+        {
+          "kind": "record",
+          "value": "task report: .engineering/reports/tasks/20260520T072628Z-AIRA-PROD-EVAL-001.md",
+          "recorded_at": "2026-05-20T07:33:39Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task manifest: .engineering/reports/tasks/20260520T072628Z-AIRA-PROD-EVAL-001.json",
+          "recorded_at": "2026-05-20T07:33:39Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task result: All required acceptance commands passed.",
+          "recorded_at": "2026-05-20T07:33:39Z",
+          "actor": "engineering-harness:auto"
+        }
+      ],
+      "remaining_limits": [
+        "The production-local evaluator consumes materialized bundle prediction CSV artifacts only.",
+        "The ablation matrix disables deterministic failure-keyword behavior; it does not retrain or call live models.",
+        "Exact paired statistical tests are reproducible but low-powered on tiny local fixtures."
+      ],
+      "next_action": "Promote evaluated bundle outputs into a reusable cross-run memory and failure index.",
+      "updated_at": "2026-05-20T07:33:39Z",
+      "notes": "Carry forward the old ARA statistical/evaluation duties into AIRA bundle artifacts: comparison metrics, ablation matrix, error taxonomy, statistical test results and machine-readable report summaries.",
+      "last_note": "Recorded automatically after a completed harness task.",
+      "last_phase": "run"
+    },
+    {
+      "id": "AIRA-PROD-MEMORY-001",
+      "title": "Build cross-run experiment memory and failure ledger",
+      "status": "completed",
+      "requirement_ids": [
+        "REQ-AIRA-MEMORY-001",
+        "REQ-AIRA-PROD-MEMORY-001"
+      ],
+      "priority": "medium",
+      "owner": "aira",
+      "depends_on": [
+        "AIRA-PROD-RUNNER-001",
+        "AIRA-PROD-EVAL-001"
+      ],
+      "acceptance": [
+        {
+          "command": "python3 -m aira memory index --runs /tmp/aira_prod_runner_bundle --out /tmp/aira_prod_memory --json",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        },
+        {
+          "command": "python3 -m pytest -q tests/test_experiment_memory.py tests/test_production_memory.py",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "command",
+          "value": "python3 -m aira memory index --runs /tmp/aira_prod_runner_bundle --out /tmp/aira_prod_memory --json"
+        },
+        {
+          "kind": "command",
+          "value": "python3 -m pytest -q tests/test_experiment_memory.py tests/test_production_memory.py"
+        },
+        {
+          "kind": "file",
+          "path": "aira/memory.py"
+        },
+        {
+          "kind": "file",
+          "path": "tests/test_experiment_memory.py"
+        },
+        {
+          "kind": "file",
+          "path": "tests/test_production_memory.py"
+        },
+        {
+          "kind": "record",
+          "value": "task report: .engineering/reports/tasks/20260520T073344Z-AIRA-PROD-MEMORY-001.md",
+          "recorded_at": "2026-05-20T07:43:33Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task manifest: .engineering/reports/tasks/20260520T073344Z-AIRA-PROD-MEMORY-001.json",
+          "recorded_at": "2026-05-20T07:43:33Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task result: All required acceptance commands passed.",
+          "recorded_at": "2026-05-20T07:43:33Z",
+          "actor": "engineering-harness:auto"
+        }
+      ],
+      "remaining_limits": [
+        "The memory index is a local file index, not a shared service or remote database.",
+        "Lifecycle controls are rebuild/status/max-run filters; automated expiry and retry execution remain future work.",
+        "Agent reflection retrieval consumes bundle artifacts and does not yet plan new experiments automatically."
+      ],
+      "next_action": "Publish production-local ARA handoff metadata and validation profile that includes the production memory index artifacts.",
+      "updated_at": "2026-05-20T07:43:33Z",
+      "notes": "Promoted bundle-local memory into a reusable local index with run summaries, failures, fingerprints, model/dataset outcomes and agent reflection retrieval.",
+      "last_note": "Recorded automatically after a completed harness task.",
+      "last_phase": "run"
+    },
+    {
+      "id": "AIRA-PROD-ARA-001",
+      "title": "Publish ARA production handoff profile for AIRA production bundles",
+      "status": "completed",
+      "requirement_ids": [
+        "REQ-AIRA-PROD-ARA-001",
+        "REQ-AIRA-ARA-001"
+      ],
+      "priority": "high",
+      "owner": "aira",
+      "depends_on": [
+        "AIRA-PROD-RUNNER-001",
+        "AIRA-PROD-REGISTRY-001",
+        "AIRA-PROD-EVAL-001",
+        "AIRA-PROD-MEMORY-001"
+      ],
+      "acceptance": [
+        {
+          "command": "python3 -m aira agent production-smoke --out /tmp/aira_prod_agent_bundle --json",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        },
+        {
+          "command": "python3 -m aira bundles validate /tmp/aira_prod_agent_bundle --profile ara-production --json",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        },
+        {
+          "command": "python3 -m pytest -q tests/test_experiment_bundle.py tests/test_production_ara_handoff.py",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        }
+      ],
+      "notes": "Expose production-local dispatch metadata and bundle validation so ARA can consume production AIRA outputs through manifest and bundle contract only.",
+      "updated_at": "2026-05-20T07:52:24Z",
+      "last_note": "Recorded automatically after a completed harness task.",
+      "last_phase": "run",
+      "evidence": [
+        {
+          "kind": "record",
+          "value": "task report: .engineering/reports/tasks/20260520T074345Z-AIRA-PROD-ARA-001.md",
+          "recorded_at": "2026-05-20T07:52:24Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task manifest: .engineering/reports/tasks/20260520T074345Z-AIRA-PROD-ARA-001.json",
+          "recorded_at": "2026-05-20T07:52:24Z",
+          "actor": "engineering-harness:auto"
+        },
+        {
+          "kind": "record",
+          "value": "task result: All required acceptance commands passed.",
+          "recorded_at": "2026-05-20T07:52:24Z",
+          "actor": "engineering-harness:auto"
+        }
+      ]
     }
   ]
 }

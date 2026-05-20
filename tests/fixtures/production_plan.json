@@ -1,0 +1,62 @@
+{
+  "schema_version": "aira.production_plan.v1",
+  "plan_id": "production-local-fixture-plan",
+  "description": "Deterministic production-local fixture plan for the bounded AIRA runner.",
+  "network_required": false,
+  "external_datasets_required": false,
+  "gpu_required": false,
+  "live_model_calls": false,
+  "resource_requirements": {
+    "python_packages": []
+  },
+  "tasks": [
+    {
+      "id": "prepare_dataset",
+      "name": "Prepare deterministic local dataset",
+      "dependencies": [],
+      "command": {
+        "kind": "inline_python",
+        "code": "import csv\nfrom pathlib import Path\n\nrows = [\n    {'example_id': 'prod-001', 'text': 'policy checks passed', 'label': 'pass'},\n    {'example_id': 'prod-002', 'text': 'runner blocked unsafe package', 'label': 'fail'},\n    {'example_id': 'prod-003', 'text': 'artifacts materialized locally', 'label': 'pass'},\n    {'example_id': 'prod-004', 'text': 'dependency failed before output', 'label': 'fail'},\n]\nwith Path('dataset.csv').open('w', newline='', encoding='utf-8') as handle:\n    writer = csv.DictWriter(handle, fieldnames=['example_id', 'text', 'label'])\n    writer.writeheader()\n    writer.writerows(rows)\nPath('results.json').write_text('{\"success\": true, \"row_count\": 4}\\n', encoding='utf-8')\nprint('prepared 4 rows')"
+      },
+      "outputs": [
+        {
+          "artifact_id": "production_dataset",
+          "path": "dataset.csv",
+          "kind": "dataset",
+          "description": "Deterministic production-local fixture dataset."
+        },
+        {
+          "artifact_id": "prepare_results",
+          "path": "results.json",
+          "kind": "task_results",
+          "description": "Prepare task result marker."
+        }
+      ]
+    },
+    {
+      "id": "score_dataset",
+      "name": "Score deterministic local dataset",
+      "dependencies": [
+        "prepare_dataset"
+      ],
+      "command": {
+        "kind": "inline_python",
+        "code": "import csv\nimport json\nimport os\nfrom pathlib import Path\n\ndep_dirs = json.loads(os.environ['AIRA_DEP_DIRS'])\ndataset_path = Path(dep_dirs['prepare_dataset']) / 'dataset.csv'\nrows = list(csv.DictReader(dataset_path.open(encoding='utf-8')))\ncorrect = 0\npredictions = []\nfor row in rows:\n    prediction = 'fail' if any(term in row['text'] for term in ['blocked', 'failed']) else 'pass'\n    correct += int(prediction == row['label'])\n    predictions.append({**row, 'prediction': prediction})\naccuracy = correct / len(rows)\nPath('metrics.json').write_text(json.dumps({'success': True, 'accuracy': accuracy, 'row_count': len(rows)}, sort_keys=True) + '\\n', encoding='utf-8')\nwith Path('predictions.csv').open('w', newline='', encoding='utf-8') as handle:\n    writer = csv.DictWriter(handle, fieldnames=['example_id', 'text', 'label', 'prediction'])\n    writer.writeheader()\n    writer.writerows(predictions)\nprint(json.dumps({'accuracy': accuracy, 'row_count': len(rows)}, sort_keys=True))"
+      },
+      "outputs": [
+        {
+          "artifact_id": "production_metrics",
+          "path": "metrics.json",
+          "kind": "metrics",
+          "description": "Deterministic production-local scoring metrics."
+        },
+        {
+          "artifact_id": "production_predictions",
+          "path": "predictions.csv",
+          "kind": "predictions",
+          "description": "Deterministic per-example production-local predictions."
+        }
+      ]
+    }
+  ]
+}

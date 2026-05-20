@@ -45,6 +45,196 @@
       "name": "Deterministic keyword classifier without negative terms",
       "network_required": false,
       "status": "local_deterministic_ablation"
+    },
+    {
+      "adapter": {
+        "enabled": true,
+        "live_model_calls": false,
+        "network_required": false,
+        "type": "builtin_runner"
+      },
+      "fingerprint": {
+        "algorithm": "sha256",
+        "material": "model:production-local-controlled-python-runner-v1:1.0.0",
+        "value": "fa18001f164781f61fb112189bffb1df81cb283427000b0df3e50e5668eb0c84"
+      },
+      "gpu_required": false,
+      "id": "production-local-controlled-python-runner-v1",
+      "implementation": "aira.production_runner.run_production_experiment",
+      "intended_use": "Execute explicit production-local experiment plans without live model APIs.",
+      "license_policy": {
+        "default_license": "project_license",
+        "redistribution_allowed": true,
+        "requires_operator_attestation": false
+      },
+      "live_model_calls": false,
+      "name": "Production-local controlled Python runner",
+      "network_required": false,
+      "profile": "production-local",
+      "reproducibility_notes": [
+        "The runner executes local inline Python under the production-local policy profile.",
+        "Model behavior is the policy-bounded execution contract, not a learned external model."
+      ],
+      "resource_policy": {
+        "gpu_required": false,
+        "live_model_calls": false,
+        "max_cpu_threads": 2,
+        "max_task_timeout_seconds": 30,
+        "network_required": false,
+        "package_installation": false
+      },
+      "status": "production_local",
+      "version": "1.0.0",
+      "versioning": {
+        "change_policy": "Policy, import deny-list, or resource limit changes require a new fingerprint.",
+        "scheme": "semver",
+        "stability": "profile pinned"
+      }
+    },
+    {
+      "adapter": {
+        "accepted_artifact_kinds": [
+          "model_config",
+          "weights",
+          "tokenizer",
+          "inference_script"
+        ],
+        "enabled": true,
+        "network_required": false,
+        "type": "operator_supplied_artifact"
+      },
+      "fingerprint": {
+        "algorithm": "sha256",
+        "material": "model:operator-supplied-model-artifact-v1:1.0.0",
+        "value": "07d70622bf4f71bada29bc1fff95baefb6868697cfc2d27050a83c06e501d3ec"
+      },
+      "gpu_required": false,
+      "id": "operator-supplied-model-artifact-v1",
+      "implementation": "operator_supplied_artifact",
+      "intended_use": "Describe local model artifacts supplied by an operator for production-local experiments.",
+      "license_policy": {
+        "default_license": "operator_supplied",
+        "redistribution_allowed": "operator_defined",
+        "requires_operator_attestation": true
+      },
+      "live_model_calls": false,
+      "name": "Operator supplied model artifact adapter",
+      "network_required": false,
+      "profile": "production-local",
+      "reproducibility_notes": [
+        "Operators must provide artifact sha256 values and compatible runtime notes.",
+        "AIRA does not fetch weights or call hosted models under production-local."
+      ],
+      "resource_policy": {
+        "gpu_required": false,
+        "live_model_calls": false,
+        "max_size_mb": 1024,
+        "network_required": false,
+        "package_installation": false,
+        "storage": "bundle_or_local_cache"
+      },
+      "status": "production_local_adapter",
+      "version": "1.0.0",
+      "versioning": {
+        "change_policy": "Model artifact bytes, config, or runtime metadata changes require a new fingerprint.",
+        "scheme": "content_addressed",
+        "stability": "sha256 pinned"
+      }
+    },
+    {
+      "adapter": {
+        "cache_root": ".aira/cache/models",
+        "enabled": true,
+        "lookup_keys": [
+          "id",
+          "version",
+          "sha256"
+        ],
+        "network_required": false,
+        "type": "local_cache"
+      },
+      "fingerprint": {
+        "algorithm": "sha256",
+        "material": "model:production-local-model-cache-v1:1.0.0",
+        "value": "1a707e08a669f8cc0c2cf998a482e045a767805693822d5d5e58ec021073992f"
+      },
+      "gpu_required": false,
+      "id": "production-local-model-cache-v1",
+      "implementation": "local_cache",
+      "intended_use": "Reuse operator-approved local model artifacts without downloads or hosted inference.",
+      "license_policy": {
+        "default_license": "operator_supplied",
+        "redistribution_allowed": "operator_defined",
+        "requires_operator_attestation": true
+      },
+      "live_model_calls": false,
+      "name": "Production-local model cache adapter",
+      "network_required": false,
+      "profile": "production-local",
+      "reproducibility_notes": [
+        "Cached model artifacts must be verified by sha256 before use.",
+        "Bundles should record the selected cache fingerprint and runtime configuration."
+      ],
+      "resource_policy": {
+        "gpu_required": false,
+        "live_model_calls": false,
+        "max_size_mb": 2048,
+        "network_required": false,
+        "package_installation": false,
+        "storage": "local_cache"
+      },
+      "status": "production_local_adapter",
+      "version": "1.0.0",
+      "versioning": {
+        "change_policy": "Cache entries are immutable by model artifact fingerprint.",
+        "scheme": "content_addressed",
+        "stability": "sha256 pinned"
+      }
+    },
+    {
+      "adapter": {
+        "activation_policy": "not_enabled_for_production_local",
+        "enabled": false,
+        "network_required": false,
+        "provider": "placeholder",
+        "type": "optional_external"
+      },
+      "fingerprint": {
+        "algorithm": "sha256",
+        "material": "model:optional-external-model-adapter-template-v1:0.1.0",
+        "value": "f974c4057056ff942ab9580fd749dd888ef1bb74bbf8693b343b3c2171c696af"
+      },
+      "gpu_required": false,
+      "id": "optional-external-model-adapter-template-v1",
+      "implementation": "external_adapter_placeholder",
+      "intended_use": "Document the external model adapter contract without enabling live or external models.",
+      "license_policy": {
+        "default_license": "unknown_until_operator_attested",
+        "redistribution_allowed": false,
+        "requires_operator_attestation": true
+      },
+      "live_model_calls": false,
+      "name": "Optional external model adapter template",
+      "network_required": false,
+      "profile": "production-local",
+      "reproducibility_notes": [
+        "This is a registry contract placeholder only; production-local audit verifies it is disabled.",
+        "No hosted inference or model download is performed by AIRA under the production-local profile."
+      ],
+      "resource_policy": {
+        "gpu_required": false,
+        "live_model_calls": false,
+        "network_required": false,
+        "package_installation": false,
+        "storage": "none_until_enabled"
+      },
+      "status": "disabled_template",
+      "version": "0.1.0",
+      "versioning": {
+        "change_policy": "Enabling requires a new profile, policy review, fingerprint, and license metadata.",
+        "scheme": "adapter_contract",
+        "stability": "disabled until explicitly implemented"
+      }
     }
   ],
   "schema_version": "aira.model_registry.v1"

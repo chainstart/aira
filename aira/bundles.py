@@ -12,6 +12,9 @@ BUNDLE_SCHEMA_VERSION = "ara.result_bundle.v1"
 VALIDATION_SCHEMA_VERSION = "aira.bundle_validation.v1"
 ARA_HANDOFF_SCHEMA_VERSION = "aira.ara_handoff.v1"
 ARA_GATE_PROFILE = "ara-public-bundle-reproduction-gate.v1"
+DEFAULT_VALIDATION_PROFILE = "aira-mvp"
+ARA_PRODUCTION_VALIDATION_PROFILE = "ara-production"
+VALIDATION_PROFILES = {DEFAULT_VALIDATION_PROFILE, ARA_PRODUCTION_VALIDATION_PROFILE}
 REQUIRED_FILES = [
     "bundle_manifest.json",
     "artifact_manifest.json",
@@ -458,7 +461,143 @@ def _validate_ara_handoff_artifact(
     return metadata
 
 
-def validate_bundle(bundle_path: str | Path) -> BundleValidationResult:
+def _validate_ara_production_profile(
+    *,
+    bundle_path: Path,
+    metadata: dict[str, Any],
+    artifact_ids: set[str],
+    artifact_details: dict[str, dict[str, Any]],
+    errors: list[str],
+    checks: list[dict[str, str]],
+) -> None:
+    before = len(errors)
+    manifest = metadata.get("bundle_manifest")
+    if not isinstance(manifest, dict):
+        errors.append("ara-production profile requires a valid bundle_manifest.json object.")
+        manifest = {}
+
+    production_runner = manifest.get("production_runner")
+    if not isinstance(production_runner, dict):
+        errors.append("ara-production profile requires bundle_manifest.json.production_runner.")
+    elif production_runner.get("profile") != "production-local":
+        errors.append("ara-production profile requires production_runner.profile to be `production-local`.")
+
+    production_evaluation = manifest.get("production_evaluation")
+    if not isinstance(production_evaluation, dict):
+        errors.append("ara-production profile requires bundle_manifest.json.production_evaluation.")
+    elif production_evaluation.get("status") != "passed":
+        errors.append("ara-production profile requires production_evaluation.status to be `passed`.")
+
+    ara_handoff = manifest.get("ara_handoff")
+    if not isinstance(ara_handoff, dict):
+        errors.append("ara-production profile requires bundle_manifest.json.ara_handoff.")
+    else:
+        if ara_handoff.get("validation_profile") != ARA_PRODUCTION_VALIDATION_PROFILE:
+            errors.append("bundle_manifest.json ara_handoff.validation_profile must be `ara-production`.")
+        if ara_handoff.get("validation_command") != (
+            "python3 -m aira bundles validate <bundle> --profile ara-production --json"
+        ):
+            errors.append("bundle_manifest.json ara_handoff.validation_command must use the ara-production profile.")
+
+    ara_gate = metadata.get("ara_gate")
+    if not isinstance(ara_gate, dict) or not ara_gate.get("required_inputs_present"):
+        errors.append("ara-production profile requires complete ARA handoff required gate inputs.")
+        required_inputs: dict[str, str] = {}
+    else:
+        required_inputs = ara_gate.get("required_inputs") if isinstance(ara_gate.get("required_inputs"), dict) else {}
+
+    production_required_inputs = {
+        "production_plan",
+        "policy_report",
+        "execution_trace",
+        "task_summary",
+        "production_evaluation_metrics",
+        "production_ablation_matrix",
+        "production_error_taxonomy",
+        "production_statistical_tests",
+        "production_report_summary",
+        "memory_index",
+        "memory_runs",
+        "memory_failures",
+        "memory_fingerprints",
+        "memory_outcomes",
+        "memory_reflections",
+    }
+    missing_inputs = sorted(production_required_inputs - set(required_inputs))
+    if missing_inputs:
+        errors.append(f"ara-production required_gate_inputs is missing keys: {missing_inputs}.")
+
+    required_artifact_ids = {
+        "ara_handoff",
+        "reproducibility_notes",
+        "production_plan",
+        "policy_report",
+        "execution_trace",
+        "task_summary",
+        "provenance",
+        "reproduction_status",
+        "run_ledger_entry",
+        "run_ledger",
+        "production_evaluation_metrics",
+        "production_ablation_matrix",
+        "production_error_taxonomy",
+        "production_statistical_tests",
+        "production_report_summary",
+        "production_memory_index",
+        "production_memory_runs",
+        "production_memory_failures",
+        "production_memory_fingerprints",
+        "production_memory_outcomes",
+        "production_memory_reflections",
+    }
+    missing_artifacts = sorted(required_artifact_ids - artifact_ids)
+    if missing_artifacts:
+        errors.append(f"ara-production artifact_manifest.json is missing artifacts: {missing_artifacts}.")
+
+    handoff_detail = artifact_details.get("ara_handoff")
+    handoff_payload = None
+    if isinstance(handoff_detail, dict) and handoff_detail.get("path"):
+        handoff_payload = _read_json(bundle_path / handoff_detail["path"], errors)
+    if not isinstance(handoff_payload, dict):
+        errors.append("ara-production profile requires a readable ara_handoff artifact.")
+    else:
+        dispatch = handoff_payload.get("dispatch")
+        if not isinstance(dispatch, dict):
+            errors.append("ara_handoff.dispatch must be an object for ara-production.")
+        else:
+            expected_dispatch = {
+                "lab_id": "aira",
+                "manifest_path": "research_lab.yaml",
+                "bundle_type": "aira_result_bundle",
+                "validation_profile": ARA_PRODUCTION_VALIDATION_PROFILE,
+                "profile": "production-local",
+            }
+            for key, expected in expected_dispatch.items():
+                if dispatch.get(key) != expected:
+                    errors.append(f"ara_handoff.dispatch.{key} must be `{expected}` for ara-production.")
+            validation_command = dispatch.get("validation_command")
+            if validation_command != "python3 -m aira bundles validate <bundle> --profile ara-production --json":
+                errors.append("ara_handoff.dispatch.validation_command must use the ara-production profile.")
+            allowed_interfaces = dispatch.get("allowed_interfaces")
+            if allowed_interfaces != ["research_lab.yaml", "aira_result_bundle"]:
+                errors.append(
+                    "ara_handoff.dispatch.allowed_interfaces must be "
+                    "['research_lab.yaml', 'aira_result_bundle']."
+                )
+
+    _check(
+        checks,
+        "ara_production_profile",
+        "pass" if len(errors) == before else "fail",
+        "Production-local ARA handoff profile exposes dispatch, evaluation, memory, and bundle gate artifacts.",
+    )
+
+
+def validate_bundle(
+    bundle_path: str | Path,
+    *,
+    profile: str = DEFAULT_VALIDATION_PROFILE,
+) -> BundleValidationResult:
     path = Path(bundle_path).expanduser().resolve()
     errors: list[str] = []
     warnings: list[str] = []
@@ -469,6 +608,8 @@ def validate_bundle(bundle_path: str | Path) -> BundleValidationResult:
     artifact_ids: set[str] = set()
     artifact_details: dict[str, dict[str, Any]] = {}
     manifest_declares_ara_handoff = False
+    if profile not in VALIDATION_PROFILES:
+        errors.append(f"Unsupported bundle validation profile: {profile}.")
 
     if not path.exists():
         _check(checks, "bundle_path", "fail", "Bundle path does not exist.")
@@ -654,8 +795,18 @@ def validate_bundle(bundle_path: str | Path) -> BundleValidationResult:
                 warnings.append(f"{relative} is empty.")
                 _check(checks, relative, "warn", f"{relative} is empty.")
 
+    if profile == ARA_PRODUCTION_VALIDATION_PROFILE:
+        _validate_ara_production_profile(
+            bundle_path=path,
+            metadata=metadata,
+            artifact_ids=artifact_ids,
+            artifact_details=artifact_details,
+            errors=errors,
+            checks=checks,
+        )
+
     metadata["required_files"] = list(REQUIRED_FILES)
-    metadata["validation_profile"] = "aira-mvp"
+    metadata["validation_profile"] = profile
     return BundleValidationResult(
         path=path,
         valid=not errors,

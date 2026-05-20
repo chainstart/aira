@@ -20,12 +20,151 @@
       "name": "Local experiment outcome text classification set",
       "network_required": false,
       "rows": 12,
+      "source": "builtin_local_fixture",
       "splits": [
         "core",
         "handoff"
       ],
-      "source": "builtin_local_fixture",
       "status": "local_deterministic"
+    },
+    {
+      "adapter": {
+        "accepted_artifact_kinds": [
+          "production_plan",
+          "dataset",
+          "task_output"
+        ],
+        "enabled": true,
+        "network_required": false,
+        "path_policy": "relative_bundle_paths_only",
+        "type": "operator_supplied_artifact"
+      },
+      "external_datasets_required": false,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "material": "dataset:operator-supplied-production-plan:1.0.0",
+        "value": "5c26ad502f5bd49d9f315a7a21627d38c9aacfcff806925760a9c64a1636d559"
+      },
+      "id": "operator-supplied-production-plan",
+      "intended_use": "Represent datasets and task outputs supplied through an explicit production-local plan.",
+      "license_policy": {
+        "default_license": "operator_supplied",
+        "redistribution_allowed": "operator_defined",
+        "requires_operator_attestation": true
+      },
+      "name": "Operator supplied production-local plan artifacts",
+      "network_required": false,
+      "profile": "production-local",
+      "reproducibility_notes": [
+        "The production runner records the source plan and per-output sha256 values in the result bundle.",
+        "Operators are responsible for preserving the exact supplied artifacts and license attestations."
+      ],
+      "resource_policy": {
+        "external_datasets_required": false,
+        "gpu_required": false,
+        "max_rows": "operator_declared",
+        "network_required": false,
+        "storage": "bundle_local"
+      },
+      "source": "operator_supplied_artifact",
+      "status": "production_local",
+      "version": "1.0.0",
+      "versioning": {
+        "change_policy": "Any task, artifact, schema, or label change requires a new plan fingerprint.",
+        "scheme": "semver",
+        "stability": "operator controlled"
+      }
+    },
+    {
+      "adapter": {
+        "cache_root": ".aira/cache/datasets",
+        "enabled": true,
+        "lookup_keys": [
+          "id",
+          "version",
+          "sha256"
+        ],
+        "network_required": false,
+        "type": "local_cache"
+      },
+      "external_datasets_required": false,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "material": "dataset:production-local-cache-dataset-v1:1.0.0",
+        "value": "06e459c50450319eebd52e34526bd962c33d0848ac3a60be02619e8a6ed688d0"
+      },
+      "id": "production-local-cache-dataset-v1",
+      "intended_use": "Reuse operator-approved local dataset artifacts without network access.",
+      "license_policy": {
+        "default_license": "operator_supplied",
+        "redistribution_allowed": "operator_defined",
+        "requires_operator_attestation": true
+      },
+      "name": "Production-local dataset cache adapter",
+      "network_required": false,
+      "profile": "production-local",
+      "reproducibility_notes": [
+        "Cache hits must be matched by sha256 before use.",
+        "The cache is optional; bundles remain reproducible from materialized artifacts."
+      ],
+      "resource_policy": {
+        "external_datasets_required": false,
+        "gpu_required": false,
+        "max_size_mb": 512,
+        "network_required": false,
+        "storage": "local_cache"
+      },
+      "source": "local_cache",
+      "status": "production_local_adapter",
+      "version": "1.0.0",
+      "versioning": {
+        "change_policy": "Cache entries are immutable by fingerprint; refreshes create new fingerprints.",
+        "scheme": "content_addressed",
+        "stability": "sha256 pinned"
+      }
+    },
+    {
+      "adapter": {
+        "activation_policy": "not_enabled_for_production_local",
+        "enabled": false,
+        "network_required": false,
+        "provider": "placeholder",
+        "type": "optional_external"
+      },
+      "external_datasets_required": false,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "material": "dataset:optional-external-dataset-adapter-template-v1:0.1.0",
+        "value": "256ad42c72f2a8583ed1cd409932bea424323177d9200f14f3be5be4f63aeff8"
+      },
+      "id": "optional-external-dataset-adapter-template-v1",
+      "intended_use": "Document the external-adapter contract without enabling external datasets.",
+      "license_policy": {
+        "default_license": "unknown_until_operator_attested",
+        "redistribution_allowed": false,
+        "requires_operator_attestation": true
+      },
+      "name": "Optional external dataset adapter template",
+      "network_required": false,
+      "profile": "production-local",
+      "reproducibility_notes": [
+        "This is a registry contract placeholder only; production-local audit verifies it is disabled.",
+        "No external download is performed by AIRA under the production-local profile."
+      ],
+      "resource_policy": {
+        "external_datasets_required": false,
+        "gpu_required": false,
+        "network_required": false,
+        "storage": "none_until_enabled"
+      },
+      "source": "external_adapter",
+      "status": "disabled_template",
+      "version": "0.1.0",
+      "versioning": {
+        "change_policy": "Enabling requires a new profile, policy review, fingerprint, and license metadata.",
+        "scheme": "adapter_contract",
+        "stability": "disabled until explicitly implemented"
+      }
     }
   ],
   "schema_version": "aira.dataset_registry.v1"

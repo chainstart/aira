@@ -1,6 +1,6 @@
 # AIRA Spec Governance
 
-日期：2026-05-19
+日期：2026-05-20
 
 状态：初始动态 spec
 
@@ -28,8 +28,27 @@ AIRA 是 ARA 生态中的 AI/ML 领域实验室。它负责 AI 研究所需的�
 - `REQ-AIRA-AGENT-001`：AI 实验自动化 agent loop。
 - `REQ-AIRA-MEMORY-001`：实验记忆、运行台账和失败记录。
 - `REQ-AIRA-ARA-001`：ARA-facing result bundle 和复现接口。
+- `REQ-AIRA-PROD-RUNNER-001`：生产级 AI 实验 runner，承接旧 ARA `ExperimentAgent`/`CodeExecutor` 的安全边界、脚本执行、资源限制和 artifact materialization。
+- `REQ-AIRA-PROD-REGISTRY-001`：生产级 dataset/model registry，支持外部数据源、local cache、fingerprint、版本策略和资源生命周期。
+- `REQ-AIRA-PROD-EVAL-001`：生产级 evaluation、ablation、error analysis 和 statistical testing artifacts。
+- `REQ-AIRA-PROD-MEMORY-001`：跨 run experiment memory、失败台账、检索接口和 agent 可复用经验。
+- `REQ-AIRA-PROD-ARA-001`：ARA production handoff profile，使 ARA 通过 `research_lab.yaml` 与 `aira_result_bundle` 消费生产级实验结果。
 
-## 4. 动态维护规则
+## 4. 生产级迁移边界
+
+原 ARA 中的 AI/ML 实验能力应迁入 AIRA，但必须分成两层：
+
+- 默认层：本地确定性 smoke/local benchmark，无网络、无 GPU、无 live model API，作为 CI 和 ARA public reproduction gate 的稳定输入。
+- 生产层：显式 profile，允许受控执行更重的 dataset/model/runner/evaluation 流程，并在 bundle 中记录资源、fingerprint、失败、统计检验和复现说明。
+
+生产层迁移的最小完成标准：
+
+1. AIRA 能在受控 runner 中执行已声明的实验计划，并 materialize 数据、模型、日志、metrics、ablation、error-analysis 和统计检验 artifacts。
+2. Dataset/model registry 能区分 built-in fixture、local cache、外部下载和 operator-supplied artifact，并记录 fingerprint 与 license/资源策略。
+3. Experiment memory 能跨 run 检索失败、模型表现、dataset fingerprint 和 agent reflection。
+4. ARA 只能通过 manifest dispatch 与 result bundle 消费 AIRA production-local 输出，不能 import AIRA 内部实验代码。
+
+## 5. 动态维护规则
 
 1. 新增 AI 实验能力前，先写入 requirement ID 和任务台账。
 2. 每个任务完成后，必须记录测试命令、fixture/local bundle、benchmark 结果或 blocker。
