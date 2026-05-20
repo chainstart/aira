@@ -64,12 +64,12 @@
     {
       "id": "REQ-AIRA-PROD-MEMORY-001",
       "title": "Cross-run experiment memory and failure ledger",
-      "status": "not_started"
+      "status": "completed"
     },
     {
       "id": "REQ-AIRA-PROD-ARA-001",
       "title": "ARA production handoff profile",
-      "status": "not_started"
+      "status": "completed"
     }
   ],
   "tasks": [

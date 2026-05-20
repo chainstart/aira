@@ -15,7 +15,7 @@
 | 顺序 | 任务 | Requirement | 状态 | 验收重点 |
 | --- | --- | --- | --- | --- |
 | 1 | `AIRA-PROD-RUNNER-001` | `REQ-AIRA-PROD-RUNNER-001` | completed | `production-local` 受控 runner、策略校验、资源限制、失败隔离、artifact materialization |
-| 2 | `AIRA-PROD-REGISTRY-001` | `REQ-AIRA-PROD-REGISTRY-001` | pending | local cache、operator-supplied artifact、可选外部 adapter、fingerprint、license/resource policy |
+| 2 | `AIRA-PROD-REGISTRY-001` | `REQ-AIRA-PROD-REGISTRY-001` | completed | local cache、operator-supplied artifact、可选外部 adapter、fingerprint、license/resource policy |
 | 3 | `AIRA-PROD-EVAL-001` | `REQ-AIRA-PROD-EVAL-001` | completed | metrics、ablation matrix、error taxonomy、statistical tests、机器可读报告 |
 | 4 | `AIRA-PROD-MEMORY-001` | `REQ-AIRA-PROD-MEMORY-001` | completed | 本地跨 run index、失败台账、dataset/model outcome 检索、agent reflection |
 | 5 | `AIRA-PROD-ARA-001` | `REQ-AIRA-PROD-ARA-001` | completed | `research_lab.yaml` production-local dispatch、`ara-production` bundle validation、ARA handoff notes |
