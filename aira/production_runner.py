@@ -1,4 +1,4 @@
-"""Bounded production-local experiment runner for AIRA."""
+"""Production experiment runner for AIRA."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -28,7 +29,7 @@ RUNNER_MODEL_ID = "production-local-controlled-python-runner-v1"
 RUNNER_DATASET_ID = "operator-supplied-production-plan"
 COMMAND = "python3 -m aira experiments run"
 
-DENY_PATTERNS = (
+DESTRUCTIVE_DENY_PATTERNS = (
     "rm -rf",
     "git reset --hard",
     "git checkout --",
@@ -36,11 +37,14 @@ DENY_PATTERNS = (
     "PRIVATE_KEY",
     "MNEMONIC",
     "withdraw",
+)
+STRICT_DENY_PATTERNS = (
+    *DESTRUCTIVE_DENY_PATTERNS,
     "curl ",
     "wget ",
     "pip install",
 )
-DENIED_IMPORT_ROOTS = {
+STRICT_DENIED_IMPORT_ROOTS = {
     "ftplib",
     "http",
     "multiprocessing",
@@ -51,7 +55,7 @@ DENIED_IMPORT_ROOTS = {
     "threading",
     "urllib",
 }
-DENIED_CALLS = {
+STRICT_DENIED_CALLS = {
     "eval",
     "exec",
     "compile",
@@ -85,6 +89,7 @@ class ProductionProfile:
     live_model_calls: bool
     gpu_required: bool
     external_datasets_required: bool
+    package_installation: bool
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -102,6 +107,7 @@ class ProductionProfile:
             "live_model_calls": self.live_model_calls,
             "gpu_required": self.gpu_required,
             "external_datasets_required": self.external_datasets_required,
+            "package_installation": self.package_installation,
         }
 
 
@@ -146,13 +152,36 @@ def production_local_profile() -> ProductionProfile:
         live_model_calls=False,
         gpu_required=False,
         external_datasets_required=False,
+        package_installation=False,
+    )
+
+
+def production_open_profile() -> ProductionProfile:
+    return ProductionProfile(
+        schema_version=PROFILE_SCHEMA_VERSION,
+        name="production-open",
+        max_tasks=64,
+        task_timeout_seconds=3600,
+        max_stdout_bytes=500_000,
+        max_stderr_bytes=500_000,
+        max_output_files_per_task=256,
+        max_cpu_threads=max(1, os.cpu_count() or 1),
+        allowed_command_kinds=("inline_python", "external_command", "shell_command", "command"),
+        allowed_packages=("*",),
+        network_policy="unrestricted",
+        live_model_calls=True,
+        gpu_required=True,
+        external_datasets_required=True,
+        package_installation=True,
     )
 
 
 def load_profile(name: str) -> ProductionProfile:
-    if name != "production-local":
-        raise ValueError("Unsupported AIRA experiment profile. Use --profile production-local.")
-    return production_local_profile()
+    if name == "production-local":
+        return production_local_profile()
+    if name == "production-open":
+        return production_open_profile()
+    raise ValueError("Unsupported AIRA experiment profile. Use --profile production-local or --profile production-open.")
 
 
 def _canonical_digest(payload: Any) -> str:
@@ -204,7 +233,7 @@ def _call_name(node: ast.AST) -> str | None:
     return None
 
 
-def _denied_calls(code: str) -> list[str]:
+def _denied_calls(code: str, denied_calls: set[str]) -> list[str]:
     try:
         parsed = ast.parse(code)
     except SyntaxError:
@@ -213,9 +242,46 @@ def _denied_calls(code: str) -> list[str]:
     for node in ast.walk(parsed):
         if isinstance(node, ast.Call):
             name = _call_name(node.func)
-            if name in DENIED_CALLS:
+            if name in denied_calls:
                 calls.add(name)
     return sorted(calls)
+
+
+def _profile_allows(flag: str, profile: ProductionProfile) -> bool:
+    return {
+        "network_required": profile.network_policy == "unrestricted",
+        "external_datasets_required": profile.external_datasets_required,
+        "gpu_required": profile.gpu_required,
+        "live_model_calls": profile.live_model_calls,
+    }.get(flag, False)
+
+
+def _normalize_package_name(package: str) -> str:
+    return (
+        package.split("[", 1)[0]
+        .split("==", 1)[0]
+        .split("!=", 1)[0]
+        .split(">=", 1)[0]
+        .split("<=", 1)[0]
+        .split("~=", 1)[0]
+        .split(">", 1)[0]
+        .split("<", 1)[0]
+        .lower()
+    )
+
+
+def _runner_model_id(profile: ProductionProfile) -> str:
+    if profile.name == "production-open":
+        return "production-open-python-runner-v1"
+    return RUNNER_MODEL_ID
+
+
+def _command_text(command: dict[str, Any]) -> str:
+    if isinstance(command.get("code"), str):
+        return str(command["code"])
+    if isinstance(command.get("argv"), list):
+        return " ".join(str(part) for part in command["argv"])
+    return str(command.get("command") or "")
 
 
 def _validate_task_graph(tasks: list[dict[str, Any]], policy: PolicyReport) -> list[str]:
@@ -284,17 +350,30 @@ def evaluate_production_policy(plan: dict[str, Any], profile: ProductionProfile)
     else:
         policy.pass_check("tasks", "Plan task count is within the profile limit.")
 
-    for flag in ("network_required", "external_datasets_required", "gpu_required", "live_model_calls"):
-        if plan.get(flag) is True:
-            policy.fail(flag, f"Plan field {flag} must not be true for production-local.")
-    policy.pass_check("profile_gates", "Production-local profile disables network, external datasets, GPU, and live calls.")
+    gated_flags = ("network_required", "external_datasets_required", "gpu_required", "live_model_calls")
+    blocked_flags: list[str] = []
+    for flag in gated_flags:
+        if plan.get(flag) is True and not _profile_allows(flag, profile):
+            blocked_flags.append(flag)
+            policy.fail(flag, f"Plan field {flag} is not allowed by profile {profile.name}.")
+    if not blocked_flags:
+        if profile.name == "production-open":
+            policy.pass_check(
+                "profile_gates",
+                "Production-open profile permits network access, external datasets, GPU use, and live model calls when requested.",
+            )
+        else:
+            policy.pass_check("profile_gates", "Production-local profile disables network, external datasets, GPU, and live calls.")
 
     allowed_packages = {package.lower() for package in profile.allowed_packages}
+    wildcard_packages = "*" in allowed_packages
     for package in _requested_packages(plan):
-        name = package.split("[", 1)[0].split("==", 1)[0].split(">=", 1)[0].split("<=", 1)[0].lower()
-        if name not in allowed_packages:
-            policy.fail("packages", f"Package is not allowed by production-local profile: {package}.")
-    if not _requested_packages(plan):
+        name = _normalize_package_name(package)
+        if not wildcard_packages and name not in allowed_packages:
+            policy.fail("packages", f"Package is not allowed by profile {profile.name}: {package}.")
+    if _requested_packages(plan) and wildcard_packages and profile.package_installation:
+        policy.pass_check("packages", "Production-open profile allows requested Python package installation.")
+    elif not _requested_packages(plan):
         policy.pass_check("packages", "Plan does not request package installation.")
 
     topo = _validate_task_graph(tasks, policy)
@@ -309,20 +388,25 @@ def evaluate_production_policy(plan: dict[str, Any], profile: ProductionProfile)
         if kind not in profile.allowed_command_kinds:
             policy.fail("command_kind", f"Task {task_id} command kind is not allowed: {kind}.")
             continue
-        code = str(command.get("code", ""))
-        for pattern in DENY_PATTERNS:
-            if pattern in code:
-                policy.fail("deny_patterns", f"Task {task_id} code contains denied pattern: {pattern}.")
-        try:
-            ast.parse(code)
-        except SyntaxError as exc:
-            policy.fail("python_syntax", f"Task {task_id} inline Python is not syntactically valid: {exc}.")
-        denied_imports = sorted(_import_roots(code) & DENIED_IMPORT_ROOTS)
-        if denied_imports:
-            policy.fail("imports", f"Task {task_id} imports denied modules: {denied_imports}.")
-        denied_calls = _denied_calls(code)
-        if denied_calls:
-            policy.fail("script_calls", f"Task {task_id} calls denied functions: {denied_calls}.")
+        command_text = _command_text(command)
+        deny_patterns = DESTRUCTIVE_DENY_PATTERNS if profile.name == "production-open" else STRICT_DENY_PATTERNS
+        for pattern in deny_patterns:
+            if pattern in command_text:
+                policy.fail("deny_patterns", f"Task {task_id} command contains denied pattern: {pattern}.")
+        if kind == "inline_python":
+            code = str(command.get("code", ""))
+            try:
+                ast.parse(code)
+            except SyntaxError as exc:
+                policy.fail("python_syntax", f"Task {task_id} inline Python is not syntactically valid: {exc}.")
+            denied_imports = sorted(_import_roots(code) & (set() if profile.name == "production-open" else STRICT_DENIED_IMPORT_ROOTS))
+            if denied_imports:
+                policy.fail("imports", f"Task {task_id} imports denied modules: {denied_imports}.")
+            denied_calls = _denied_calls(code, set() if profile.name == "production-open" else STRICT_DENIED_CALLS)
+            if denied_calls:
+                policy.fail("script_calls", f"Task {task_id} calls denied functions: {denied_calls}.")
+        elif not (command.get("command") or command.get("argv")):
+            policy.fail("command", f"Task {task_id} external command must provide command or argv.")
         outputs = task.get("outputs", [])
         if not isinstance(outputs, list) or not outputs:
             policy.fail("outputs", f"Task {task_id} must declare at least one output artifact.")
@@ -343,7 +427,7 @@ def evaluate_production_policy(plan: dict[str, Any], profile: ProductionProfile)
             if not _safe_relative_path(output_path):
                 policy.fail("outputs", f"Task {task_id} output path is not safe: {output_path}.")
     if policy.allowed:
-        policy.pass_check("script_controls", "All tasks use allowed inline Python scripts with declared outputs.")
+        policy.pass_check("script_controls", "All tasks use command kinds allowed by the selected profile with declared outputs.")
     return policy, topo
 
 
@@ -379,11 +463,23 @@ def _execute_task(
     task_id = str(task["id"])
     task_dir = out / "work" / "tasks" / task_id
     task_dir.mkdir(parents=True, exist_ok=True)
-    script_path = task_dir / "run.py"
-    script_path.write_text(str(task["command"]["code"]).rstrip() + "\n", encoding="utf-8")
     dep_dirs = {dep: task_dirs[dep] for dep in task.get("dependencies", []) or [] if dep in task_dirs}
+    command = task["command"]
+    kind = str(command.get("kind", "inline_python"))
+    if kind == "inline_python":
+        script_path = task_dir / "run.py"
+        script_path.write_text(str(command["code"]).rstrip() + "\n", encoding="utf-8")
+        argv = [sys.executable, str(script_path)]
+        command_display = " ".join(argv)
+    else:
+        script_path = None
+        if isinstance(command.get("argv"), list):
+            argv = [str(part) for part in command["argv"]]
+        else:
+            argv = shlex.split(str(command.get("command") or ""))
+        command_display = " ".join(argv)
     result = subprocess.run(
-        [sys.executable, str(script_path)],
+        argv,
         cwd=task_dir,
         env=_bounded_env(profile, out, task_dir, dep_dirs),
         capture_output=True,
@@ -397,7 +493,9 @@ def _execute_task(
         "timed_out": False,
         "stdout": _truncate(result.stdout, profile.max_stdout_bytes),
         "stderr": _truncate(result.stderr, profile.max_stderr_bytes),
-        "script_path": str(script_path),
+        "script_path": str(script_path) if script_path else None,
+        "command": command_display,
+        "command_kind": kind,
         "task_dir": str(task_dir),
     }
 
@@ -451,6 +549,58 @@ def _load_plan(plan_path: str | Path) -> dict[str, Any]:
     return data
 
 
+def _install_requested_packages(plan: dict[str, Any], profile: ProductionProfile, policy: PolicyReport, out: Path) -> None:
+    packages = _requested_packages(plan)
+    if not packages or not profile.package_installation:
+        return
+    install_dir = out / "work" / "package_install"
+    install_dir.mkdir(parents=True, exist_ok=True)
+    cmd = [sys.executable, "-m", "pip", "install", "--quiet", *packages]
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=install_dir,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+    except subprocess.TimeoutExpired as exc:
+        (install_dir / "stdout.txt").write_text(exc.stdout or "", encoding="utf-8", errors="ignore")
+        (install_dir / "stderr.txt").write_text(exc.stderr or "pip install timed out", encoding="utf-8", errors="ignore")
+        policy.fail("package_installation", "Requested package installation timed out.")
+        return
+    (install_dir / "stdout.txt").write_text(proc.stdout, encoding="utf-8", errors="ignore")
+    (install_dir / "stderr.txt").write_text(proc.stderr, encoding="utf-8", errors="ignore")
+    if proc.returncode == 0:
+        policy.pass_check("package_installation", f"Installed requested Python packages: {packages}.")
+    else:
+        policy.fail("package_installation", f"Package installation failed with return code {proc.returncode}.")
+
+
+def _execution_flags(plan: dict[str, Any], profile: ProductionProfile) -> dict[str, bool]:
+    return {
+        "network_required": bool(plan.get("network_required")) or profile.network_policy == "unrestricted",
+        "external_datasets_required": bool(plan.get("external_datasets_required")) or profile.external_datasets_required,
+        "gpu_required": bool(plan.get("gpu_required")) or profile.gpu_required,
+        "live_model_calls": bool(plan.get("live_model_calls")) or profile.live_model_calls,
+        "package_installation": bool(_requested_packages(plan)) and profile.package_installation,
+    }
+
+
+def _profile_limitations(profile: ProductionProfile, flags: dict[str, bool]) -> list[str]:
+    if profile.name == "production-open":
+        return [
+            "The production-open profile intentionally permits package installation, network downloads, external datasets, GPU execution, and live model/API calls when requested by the plan.",
+            "Reproducibility depends on recorded package versions, external data/model fingerprints, API/model versions, and operator-provided license or credential attestations.",
+            "AIRA still records policy, execution trace, provenance, materialized artifacts, and run ledger entries, but open-profile runs are not deterministic by default.",
+        ]
+    return [
+        "The production-local profile executes only explicitly declared local Python tasks.",
+        "No package installation, network access, GPU execution, external datasets, or live model APIs are enabled.",
+        "The runner provides local subprocess isolation and timeout bounds, not a container sandbox.",
+    ]
+
+
 def _write_bundle(
     *,
     out: Path,
@@ -467,7 +617,16 @@ def _write_bundle(
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     memory_dir.mkdir(parents=True, exist_ok=True)
 
-    plan_id = str(plan.get("plan_id", "production-local-plan"))
+    plan_id = str(plan.get("plan_id", f"{profile.name}-plan"))
+    flags = _execution_flags(plan, profile)
+    model_id = _runner_model_id(profile)
+    deterministic = not (
+        flags["network_required"]
+        or flags["external_datasets_required"]
+        or flags["gpu_required"]
+        or flags["live_model_calls"]
+    )
+    limitations = _profile_limitations(profile, flags)
     status = "passed" if policy.allowed and all(task["status"] == "passed" for task in task_records) else "failed"
     task_summary = {
         "schema_version": "aira.production_task_summary.v1",
@@ -495,7 +654,7 @@ def _write_bundle(
         "created_at": CREATED_AT,
         "benchmark_id": plan_id,
         "dataset_id": RUNNER_DATASET_ID,
-        "model_id": RUNNER_MODEL_ID,
+        "model_id": model_id,
         "input_fingerprints": {
             "dataset_sha256": _canonical_digest(plan.get("tasks", [])),
             "model_config_sha256": _canonical_digest(profile.to_dict()),
@@ -509,18 +668,15 @@ def _write_bundle(
             "platform": platform.platform(),
         },
         "determinism": {
-            "deterministic": True,
+            "deterministic": deterministic,
             "random_seed": None,
-            "network_required": False,
-            "external_datasets_required": False,
-            "gpu_required": False,
-            "live_model_calls": False,
+            "network_required": flags["network_required"],
+            "external_datasets_required": flags["external_datasets_required"],
+            "gpu_required": flags["gpu_required"],
+            "live_model_calls": flags["live_model_calls"],
+            "package_installation": flags["package_installation"],
         },
-        "limitations": [
-            "The production-local profile executes only explicitly declared local Python tasks.",
-            "No package installation, network access, GPU execution, external datasets, or live model APIs are enabled.",
-            "The runner provides local subprocess isolation and timeout bounds, not a container sandbox.",
-        ],
+        "limitations": limitations,
     }
     ledger_entry = {
         "schema_version": "aira.run_ledger_entry.v1",
@@ -532,7 +688,7 @@ def _write_bundle(
         "bundle_type": "aira_result_bundle",
         "benchmark_id": plan_id,
         "dataset_id": RUNNER_DATASET_ID,
-        "model_id": RUNNER_MODEL_ID,
+        "model_id": model_id,
         "metrics": {
             "task_count": task_summary["task_count"],
             "passed_task_count": task_summary["passed_task_count"],
@@ -545,11 +701,12 @@ def _write_bundle(
             "model_config_sha256": provenance["input_fingerprints"]["model_config_sha256"],
         },
         "reproducibility": {
-            "deterministic": True,
-            "network_required": False,
-            "external_datasets_required": False,
-            "gpu_required": False,
-            "live_model_calls": False,
+            "deterministic": deterministic,
+            "network_required": flags["network_required"],
+            "external_datasets_required": flags["external_datasets_required"],
+            "gpu_required": flags["gpu_required"],
+            "live_model_calls": flags["live_model_calls"],
+            "package_installation": flags["package_installation"],
             "command": f"{COMMAND} --profile {profile.name} --plan {plan_path} --out <bundle>",
         },
         "artifacts": [
@@ -568,11 +725,12 @@ def _write_bundle(
         "run_id": run_id,
         "task_id": TASK_ID,
         "benchmark_id": plan_id,
-        "deterministic": True,
-        "network_required": False,
-        "external_datasets_required": False,
-        "gpu_required": False,
-        "live_model_calls": False,
+        "deterministic": deterministic,
+        "network_required": flags["network_required"],
+        "external_datasets_required": flags["external_datasets_required"],
+        "gpu_required": flags["gpu_required"],
+        "live_model_calls": flags["live_model_calls"],
+        "package_installation": flags["package_installation"],
         "command": f"{COMMAND} --profile {profile.name} --plan {plan_path} --out <bundle>",
         "metrics": ledger_entry["metrics"],
     }
@@ -591,13 +749,13 @@ def _write_bundle(
             "artifact_id": "production_plan",
             "path": "artifacts/production_plan.json",
             "kind": "production_plan",
-            "description": "Policy-checked production-local experiment plan.",
+            "description": f"Policy-checked {profile.name} experiment plan.",
         },
         {
             "artifact_id": "policy_report",
             "path": "artifacts/policy_report.json",
             "kind": "policy_report",
-            "description": "Production-local profile, package, script, and resource policy checks.",
+            "description": f"{profile.name} profile, package, command, and resource policy checks.",
         },
         {
             "artifact_id": "execution_trace",
@@ -621,13 +779,13 @@ def _write_bundle(
             "artifact_id": "reproduction_status",
             "path": "artifacts/reproduction_status.json",
             "kind": "reproduction_status",
-            "description": "Local reproduction status for the production-local run.",
+            "description": f"Local reproduction status for the {profile.name} run.",
         },
         {
             "artifact_id": "run_ledger_entry",
             "path": "artifacts/run_ledger_entry.json",
             "kind": "run_ledger_entry",
-            "description": "Machine-readable production-local runner ledger row.",
+            "description": f"Machine-readable {profile.name} runner ledger row.",
         },
         {
             "artifact_id": "run_ledger",
@@ -650,12 +808,13 @@ def _write_bundle(
             "run_id": run_id,
             "benchmark_id": plan_id,
             "dataset_id": RUNNER_DATASET_ID,
-            "model_id": RUNNER_MODEL_ID,
-            "deterministic": True,
-            "network_required": False,
-            "external_datasets_required": False,
-            "gpu_required": False,
-            "live_model_calls": False,
+            "model_id": model_id,
+            "deterministic": deterministic,
+            "network_required": flags["network_required"],
+            "external_datasets_required": flags["external_datasets_required"],
+            "gpu_required": flags["gpu_required"],
+            "live_model_calls": flags["live_model_calls"],
+            "package_installation": flags["package_installation"],
             "production_runner": {
                 "schema_version": RUNNER_SCHEMA_VERSION,
                 "profile": profile.name,
@@ -672,8 +831,8 @@ def _write_bundle(
                 {
                     "claim_id": "aira-production-runner-c1",
                     "claim": (
-                        "The AIRA production-local runner executed a policy-checked local experiment plan "
-                        "with explicit profile gating, resource bounds, failure isolation, and materialized artifacts."
+                        f"The AIRA {profile.name} runner executed a policy-checked experiment plan "
+                        "with explicit profile gating, resource accounting, failure isolation, and materialized artifacts."
                     ),
                     "status": claim_status,
                     "reproduction_status": "reproduced" if status == "passed" else "failed",
@@ -685,7 +844,7 @@ def _write_bundle(
                         "provenance",
                         "run_ledger_entry",
                     ],
-                    "limitations": provenance["limitations"],
+                    "limitations": limitations,
                 }
             ]
         },
@@ -693,17 +852,17 @@ def _write_bundle(
     (out / "writing_brief.md").write_text(
         "\n".join(
             [
-                "# AIRA Production-Local Runner",
+                f"# AIRA {profile.name} Runner",
                 "",
-                "This bundle records a bounded production-local experiment runner invocation.",
-                "It is intended to move script execution responsibility from legacy ARA into AIRA while keeping local reproduction deterministic.",
+                f"This bundle records an AIRA `{profile.name}` experiment runner invocation.",
+                "It is intended to move script execution responsibility from legacy ARA into AIRA while preserving artifact, provenance, and claim-boundary records.",
                 "",
             ]
         ),
         encoding="utf-8",
     )
     (out / "limitations.md").write_text(
-        "\n".join(["# Limitations", "", *[f"- {item}" for item in provenance["limitations"]], ""]),
+        "\n".join(["# Limitations", "", *[f"- {item}" for item in limitations], ""]),
         encoding="utf-8",
     )
     validation = validate_bundle(out)
@@ -732,6 +891,8 @@ def run_production_experiment(profile_name: str, plan_path: str | Path, output_d
     status_by_task: dict[str, str] = {}
     task_map = {str(task["id"]): task for task in plan.get("tasks", []) if isinstance(task, dict) and "id" in task}
 
+    if policy.allowed:
+        _install_requested_packages(plan, profile, policy, out)
     if policy.allowed:
         for task_id in task_order:
             task = task_map[task_id]

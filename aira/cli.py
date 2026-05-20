@@ -46,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     bundles_validate.add_argument(
         "--profile",
         default="aira-mvp",
-        choices=["aira-mvp", "ara-production"],
+        choices=["aira-mvp", "ara-production", "ara-production-open"],
         help="Bundle validation profile.",
     )
     bundles_validate.add_argument("--json", action="store_true", help="Print JSON output.")
@@ -110,7 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     experiments = subparsers.add_parser("experiments", help="Run bounded AIRA experiment plans.")
     experiments_sub = experiments.add_subparsers(dest="experiments_command", required=True)
-    experiments_run = experiments_sub.add_parser("run", help="Run a policy-gated production-local experiment plan.")
+    experiments_run = experiments_sub.add_parser("run", help="Run a policy-gated production experiment plan.")
     experiments_run.add_argument("--profile", required=True, help="Experiment execution profile.")
     experiments_run.add_argument("--plan", required=True, help="Production plan JSON path.")
     experiments_run.add_argument("--out", required=True, help="Output bundle directory.")

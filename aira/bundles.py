@@ -14,7 +14,8 @@ ARA_HANDOFF_SCHEMA_VERSION = "aira.ara_handoff.v1"
 ARA_GATE_PROFILE = "ara-public-bundle-reproduction-gate.v1"
 DEFAULT_VALIDATION_PROFILE = "aira-mvp"
 ARA_PRODUCTION_VALIDATION_PROFILE = "ara-production"
-VALIDATION_PROFILES = {DEFAULT_VALIDATION_PROFILE, ARA_PRODUCTION_VALIDATION_PROFILE}
+ARA_PRODUCTION_OPEN_VALIDATION_PROFILE = "ara-production-open"
+VALIDATION_PROFILES = {DEFAULT_VALIDATION_PROFILE, ARA_PRODUCTION_VALIDATION_PROFILE, ARA_PRODUCTION_OPEN_VALIDATION_PROFILE}
 REQUIRED_FILES = [
     "bundle_manifest.json",
     "artifact_manifest.json",
@@ -289,10 +290,15 @@ def _validate_provenance_artifact(payload: Any, source: str, errors: list[str]) 
     if not isinstance(determinism, dict):
         errors.append(f"{source} field `determinism` must be an object.")
     else:
-        if determinism.get("deterministic") is not True:
-            errors.append(f"{source} determinism.deterministic must be true.")
-        for key in ("network_required", "external_datasets_required", "gpu_required", "live_model_calls"):
-            _validate_false_flag(determinism, key, f"{source}.determinism", errors)
+        dynamic_flags = {
+            key: determinism.get(key) is True
+            for key in ("network_required", "external_datasets_required", "gpu_required", "live_model_calls")
+        }
+        if determinism.get("deterministic") is not True and not any(dynamic_flags.values()):
+            errors.append(f"{source} determinism.deterministic must be true unless dynamic open-profile resources are declared.")
+        if determinism.get("deterministic") is True:
+            for key in dynamic_flags:
+                _validate_false_flag(determinism, key, f"{source}.determinism", errors)
 
 
 def _validate_run_ledger_entry(payload: Any, source: str, errors: list[str]) -> None:
@@ -312,10 +318,15 @@ def _validate_run_ledger_entry(payload: Any, source: str, errors: list[str]) -> 
     if not isinstance(reproducibility, dict):
         errors.append(f"{source} field `reproducibility` must be an object.")
     else:
-        if reproducibility.get("deterministic") is not True:
-            errors.append(f"{source} reproducibility.deterministic must be true.")
-        for key in ("network_required", "external_datasets_required", "gpu_required", "live_model_calls"):
-            _validate_false_flag(reproducibility, key, f"{source}.reproducibility", errors)
+        dynamic_flags = {
+            key: reproducibility.get(key) is True
+            for key in ("network_required", "external_datasets_required", "gpu_required", "live_model_calls")
+        }
+        if reproducibility.get("deterministic") is not True and not any(dynamic_flags.values()):
+            errors.append(f"{source} reproducibility.deterministic must be true unless dynamic open-profile resources are declared.")
+        if reproducibility.get("deterministic") is True:
+            for key in dynamic_flags:
+                _validate_false_flag(reproducibility, key, f"{source}.reproducibility", errors)
 
 
 def _run_id_from_ledger_payload(payload: Any) -> str | None:
@@ -593,6 +604,53 @@ def _validate_ara_production_profile(
     )
 
 
+def _validate_ara_production_open_profile(
+    *,
+    metadata: dict[str, Any],
+    artifact_ids: set[str],
+    errors: list[str],
+    checks: list[dict[str, str]],
+) -> None:
+    before = len(errors)
+    manifest = metadata.get("bundle_manifest")
+    if not isinstance(manifest, dict):
+        errors.append("ara-production-open profile requires a valid bundle_manifest.json object.")
+        manifest = {}
+
+    production_runner = manifest.get("production_runner")
+    if not isinstance(production_runner, dict):
+        errors.append("ara-production-open profile requires bundle_manifest.json.production_runner.")
+    elif production_runner.get("profile") != "production-open":
+        errors.append("ara-production-open profile requires production_runner.profile to be `production-open`.")
+
+    if manifest.get("deterministic") is not False:
+        errors.append("ara-production-open profile requires bundle_manifest.json.deterministic to be false.")
+    for key in ("network_required", "external_datasets_required", "gpu_required", "live_model_calls"):
+        if manifest.get(key) is not True:
+            errors.append(f"ara-production-open profile requires bundle_manifest.json.{key} to be true.")
+
+    required_artifact_ids = {
+        "production_plan",
+        "policy_report",
+        "execution_trace",
+        "task_summary",
+        "provenance",
+        "reproduction_status",
+        "run_ledger_entry",
+        "run_ledger",
+    }
+    missing_artifacts = sorted(required_artifact_ids - artifact_ids)
+    if missing_artifacts:
+        errors.append(f"ara-production-open artifact_manifest.json is missing artifacts: {missing_artifacts}.")
+
+    _check(
+        checks,
+        "ara_production_open_profile",
+        "pass" if len(errors) == before else "fail",
+        "Production-open ARA validation profile exposes open experiment policy, execution, provenance, and ledger artifacts.",
+    )
+
+
 def validate_bundle(
     bundle_path: str | Path,
     *,
@@ -801,6 +859,13 @@ def validate_bundle(
             metadata=metadata,
             artifact_ids=artifact_ids,
             artifact_details=artifact_details,
+            errors=errors,
+            checks=checks,
+        )
+    elif profile == ARA_PRODUCTION_OPEN_VALIDATION_PROFILE:
+        _validate_ara_production_open_profile(
+            metadata=metadata,
+            artifact_ids=artifact_ids,
             errors=errors,
             checks=checks,
         )

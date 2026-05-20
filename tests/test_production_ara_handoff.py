@@ -78,9 +78,15 @@ def test_production_handoff_cli_and_manifest_dispatch(tmp_path, capsys):
     production_profiles = [
         profile for profile in manifest["bundle_handoff_profiles"] if profile.get("profile") == "ara-production"
     ]
+    production_open_profiles = [
+        profile for profile in manifest["bundle_handoff_profiles"] if profile.get("profile") == "ara-production-open"
+    ]
     assert production_profiles
     assert production_profiles[0]["dispatch"]["allowed_interfaces"] == [
         "research_lab.yaml",
         "aira_result_bundle",
     ]
     assert production_profiles[0]["validation_command"].endswith("--profile ara-production --json")
+    assert production_open_profiles
+    assert production_open_profiles[0]["dispatch"]["profile"] == "production-open"
+    assert production_open_profiles[0]["validation_command"].endswith("--profile ara-production-open --json")

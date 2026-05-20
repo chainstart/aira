@@ -165,6 +165,49 @@
         "scheme": "adapter_contract",
         "stability": "disabled until explicitly implemented"
       }
+    },
+    {
+      "adapter": {
+        "activation_policy": "enabled_by_production_open_profile",
+        "enabled": true,
+        "network_required": true,
+        "type": "optional_external"
+      },
+      "external_datasets_required": true,
+      "fingerprint": {
+        "algorithm": "sha256",
+        "material": "dataset:external-download-dataset-adapter-v1:1.0.0",
+        "value": "550ddf735b35b3d3659ba5997c7ab650641ee9f98724612fb918ec943c702291"
+      },
+      "id": "external-download-dataset-adapter-v1",
+      "intended_use": "Download and use external datasets for unrestricted AIRA experiments.",
+      "license_policy": {
+        "default_license": "source_declared",
+        "redistribution_allowed": "source_license_defined",
+        "requires_operator_attestation": true
+      },
+      "name": "External dataset download adapter",
+      "network_required": true,
+      "profile": "production-open",
+      "reproducibility_notes": [
+        "Production-open permits remote dataset downloads and records retrieval metadata in the result bundle.",
+        "Operators must preserve source URL, license, and fingerprints for publishable claims."
+      ],
+      "resource_policy": {
+        "external_datasets_required": true,
+        "gpu_required": false,
+        "max_size_mb": "operator_declared",
+        "network_required": true,
+        "storage": "download_or_cache"
+      },
+      "source": "external_download",
+      "status": "production_open",
+      "version": "1.0.0",
+      "versioning": {
+        "change_policy": "Downloaded datasets must record source URL, license, retrieval time, and fingerprints when available.",
+        "scheme": "content_addressed_when_available",
+        "stability": "operator controlled"
+      }
     }
   ],
   "schema_version": "aira.dataset_registry.v1"

@@ -235,6 +235,88 @@
         "scheme": "adapter_contract",
         "stability": "disabled until explicitly implemented"
       }
+    },
+    {
+      "adapter": {
+        "enabled": true,
+        "live_model_calls": true,
+        "network_required": true,
+        "type": "builtin_runner"
+      },
+      "fingerprint": {
+        "algorithm": "sha256",
+        "material": "model:production-open-python-runner-v1:1.0.0",
+        "value": "6dbc65d191bdc97132f709c6bae0b772ba1f0b939b089c0ccfcfc864408e5e2a"
+      },
+      "gpu_required": true,
+      "id": "production-open-python-runner-v1",
+      "implementation": "aira.production_runner.run_production_experiment",
+      "intended_use": "Execute unrestricted AIRA AI/ML experiment plans.",
+      "license_policy": {
+        "default_license": "project_license",
+        "redistribution_allowed": true,
+        "requires_operator_attestation": false
+      },
+      "live_model_calls": true,
+      "name": "Production-open Python and command runner",
+      "network_required": true,
+      "profile": "production-open",
+      "reproducibility_notes": [
+        "The production-open runner can install packages, run command tasks, download data or models, use GPU, and call live model APIs.",
+        "Runs are not assumed deterministic; bundles must capture versions, fingerprints, and external service metadata."
+      ],
+      "resource_policy": {
+        "gpu_required": true,
+        "live_model_calls": true,
+        "max_cpu_threads": "host_available",
+        "max_task_timeout_seconds": 3600,
+        "network_required": true,
+        "package_installation": true
+      },
+      "status": "production_open",
+      "version": "1.0.0",
+      "versioning": {
+        "change_policy": "Execution surface changes require a new runner fingerprint.",
+        "scheme": "semver",
+        "stability": "profile pinned"
+      }
+    },
+    {
+      "adapter": {
+        "activation_policy": "operator_supplied_credentials",
+        "enabled": true,
+        "network_required": true,
+        "type": "hosted_model_api"
+      },
+      "fingerprint": {
+        "algorithm": "sha256",
+        "material": "model:hosted-model-api-adapter-v1:1.0.0",
+        "value": "926fd1e80067ead1f620db8a306e01aafc8f97362280a31f9db5a5933644b34b"
+      },
+      "gpu_required": false,
+      "id": "hosted-model-api-adapter-v1",
+      "implementation": "operator_configured_hosted_api",
+      "intended_use": "Call externally hosted models during production-open experiments.",
+      "license_policy": {
+        "default_license": "provider_terms",
+        "redistribution_allowed": "provider_terms_defined",
+        "requires_operator_attestation": true
+      },
+      "live_model_calls": true,
+      "name": "Hosted model API adapter",
+      "network_required": true,
+      "profile": "production-open",
+      "reproducibility_notes": [
+        "Hosted model calls must record provider, model id, version/date, request parameters, and response fingerprints where possible."
+      ],
+      "resource_policy": {
+        "gpu_required": false,
+        "live_model_calls": true,
+        "network_required": true,
+        "package_installation": true
+      },
+      "status": "production_open",
+      "version": "1.0.0"
     }
   ],
   "schema_version": "aira.model_registry.v1"

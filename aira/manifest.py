@@ -147,10 +147,10 @@ def validate_manifest(raw: dict[str, Any]) -> ManifestValidation:
     safety = _mapping(raw.get("safety"))
     if safety.get("destructive_commands") is not False:
         errors.append("`safety.destructive_commands` must be false.")
-    if safety.get("network_policy") not in {"none", "restricted"}:
-        errors.append("`safety.network_policy` must be `none` or `restricted`.")
-    if safety.get("live_model_calls") is not False:
-        errors.append("`safety.live_model_calls` must be false for the bootstrap MVP.")
+    if safety.get("network_policy") not in {"none", "restricted", "unrestricted"}:
+        errors.append("`safety.network_policy` must be `none`, `restricted`, or `unrestricted`.")
+    if not isinstance(safety.get("live_model_calls"), bool):
+        errors.append("`safety.live_model_calls` must be a boolean.")
 
     return ManifestValidation(valid=not errors, errors=errors, warnings=warnings)
 

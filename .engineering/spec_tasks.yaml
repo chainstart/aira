@@ -397,6 +397,11 @@
           "workdir": "/home/biostar/work/projects/aira"
         },
         {
+          "command": "python3 -m aira experiments run --profile production-open --plan tests/fixtures/production_open_plan.json --out /tmp/aira_prod_open_bundle --json",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        },
+        {
           "command": "python3 -m pytest -q tests/test_production_runner.py tests/test_migration_inventory.py",
           "required": true,
           "workdir": "/home/biostar/work/projects/aira"
@@ -411,6 +416,10 @@
         {
           "kind": "command",
           "value": "python3 -m aira experiments run --profile production-local --plan tests/fixtures/production_plan.json --out /tmp/aira_prod_runner_bundle --json"
+        },
+        {
+          "kind": "command",
+          "value": "python3 -m aira experiments run --profile production-open --plan tests/fixtures/production_open_plan.json --out /tmp/aira_prod_open_bundle --json"
         },
         {
           "kind": "test",
@@ -448,9 +457,9 @@
         }
       ],
       "remaining_limits": [
-        "Only the explicit production-local profile is enabled.",
+        "production-open is explicit and non-deterministic when open resources are used; default smoke/local and production-local remain deterministic.",
         "The runner executes local inline Python tasks with subprocess timeouts, not container isolation.",
-        "Package installation, network access, GPU execution, external datasets, and live model APIs remain disabled."
+        "Package installation, network access, GPU execution, external datasets, and live model APIs are enabled only under production-open."
       ],
       "next_action": "Build production registry adapters and production evaluation artifacts on top of the bounded runner.",
       "updated_at": "2026-05-20T07:08:38Z",
@@ -477,16 +486,25 @@
           "workdir": "/home/biostar/work/projects/aira"
         },
         {
+          "command": "python3 -m aira registry audit --profile production-open --json",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        },
+        {
           "command": "python3 -m pytest -q tests/test_registry.py tests/test_production_registry.py",
           "required": true,
           "workdir": "/home/biostar/work/projects/aira"
         }
       ],
-      "notes": "Extended the current built-in registry with production entries for local cache, operator-supplied artifacts and optional external dataset/model adapters. Every production-local entry records fingerprint, version, license/resource policy and reproducibility notes.",
+      "notes": "Extended the current built-in registry with production-local entries plus production-open external dataset/model/API adapters. Every production profile entry records fingerprint, version, license/resource policy and reproducibility notes.",
       "evidence": [
         {
           "kind": "command",
           "value": "python3 -m aira registry audit --profile production-local --json"
+        },
+        {
+          "kind": "command",
+          "value": "python3 -m aira registry audit --profile production-open --json"
         },
         {
           "kind": "command",
@@ -528,8 +546,8 @@
         }
       ],
       "remaining_limits": [
-        "Optional external dataset/model adapters are registered as disabled templates only.",
-        "No network datasets, GPU execution, live model APIs, package installation, or external model downloads are enabled.",
+        "production-local keeps optional external dataset/model adapters disabled.",
+        "production-open enables external dataset/model/API adapters, with license, credential and source fingerprint details recorded by real runs.",
         "Operator-supplied artifact licensing and redistribution remain operator-attested metadata."
       ],
       "next_action": "Build production evaluation, ablation, error-analysis, and statistical testing artifacts on top of the production-local registry and runner.",
@@ -714,12 +732,17 @@
           "workdir": "/home/biostar/work/projects/aira"
         },
         {
+          "command": "python3 -m aira experiments run --profile production-open --plan tests/fixtures/production_open_plan.json --out /tmp/aira_prod_open_bundle --json && python3 -m aira bundles validate /tmp/aira_prod_open_bundle --profile ara-production-open --json",
+          "required": true,
+          "workdir": "/home/biostar/work/projects/aira"
+        },
+        {
           "command": "python3 -m pytest -q tests/test_experiment_bundle.py tests/test_production_ara_handoff.py",
           "required": true,
           "workdir": "/home/biostar/work/projects/aira"
         }
       ],
-      "notes": "Expose production-local dispatch metadata and bundle validation so ARA can consume production AIRA outputs through manifest and bundle contract only.",
+      "notes": "Expose production-local and production-open dispatch metadata and bundle validation so ARA can consume production AIRA outputs through manifest and bundle contract only.",
       "updated_at": "2026-05-20T07:52:24Z",
       "last_note": "Recorded automatically after a completed harness task.",
       "last_phase": "run",

@@ -1,0 +1,48 @@
+{
+  "schema_version": "aira.production_plan.v1",
+  "plan_id": "production-open-fixture-plan",
+  "description": "Fixture plan exercising AIRA production-open policy surface without requiring network in CI.",
+  "network_required": true,
+  "external_datasets_required": true,
+  "gpu_required": true,
+  "live_model_calls": true,
+  "resource_requirements": {
+    "python_packages": []
+  },
+  "tasks": [
+    {
+      "id": "open_capability_report",
+      "command": {
+        "kind": "inline_python",
+        "code": "import json, os, sys, urllib.request, subprocess\nfrom pathlib import Path\nflags = {\n    'profile': os.environ.get('AIRA_PROFILE'),\n    'network_policy': os.environ.get('AIRA_NETWORK_POLICY'),\n    'python': sys.version.split()[0],\n    'urllib_available': hasattr(urllib.request, 'urlopen'),\n    'subprocess_available': hasattr(subprocess, 'run'),\n}\nPath('open_capability_report.json').write_text(json.dumps(flags, indent=2), encoding='utf-8')\nprint(json.dumps(flags))\n"
+      },
+      "outputs": [
+        {
+          "artifact_id": "open_capability_report",
+          "path": "open_capability_report.json",
+          "kind": "capability_report",
+          "description": "Machine-readable report proving production-open admits network-capable imports and subprocess-capable code."
+        }
+      ]
+    },
+    {
+      "id": "external_command_report",
+      "command": {
+        "kind": "external_command",
+        "argv": [
+          "python3",
+          "-c",
+          "from pathlib import Path; Path('external_command_report.txt').write_text('external command executed\\n', encoding='utf-8')"
+        ]
+      },
+      "outputs": [
+        {
+          "artifact_id": "external_command_report",
+          "path": "external_command_report.txt",
+          "kind": "command_report",
+          "description": "Report proving production-open can run external command tasks."
+        }
+      ]
+    }
+  ]
+}

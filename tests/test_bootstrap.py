@@ -12,7 +12,11 @@ def test_research_lab_manifest_is_valid():
     assert manifest.lab_id == "aira"
     assert manifest.domain == "ai_ml"
     assert manifest.bundle_types == ["aira_result_bundle"]
-    assert manifest.to_dict()["safety"]["live_model_calls"] is False
+    payload = manifest.to_dict()
+    assert payload["safety"]["network_policy"] == "unrestricted"
+    assert payload["safety"]["live_model_calls"] is True
+    assert payload["profiles"]["production-open"]["gpu_required"] is True
+    assert payload["profiles"]["production-open"]["package_installation"] is True
 
 
 def test_labs_inspect_cli_emits_manifest_json(capsys):
@@ -25,9 +29,11 @@ def test_labs_inspect_cli_emits_manifest_json(capsys):
     assert payload["bundle_types"] == ["aira_result_bundle"]
     assert payload["bundle_handoff_profiles"][0]["profile"] == "ara-public-bundle-reproduction-gate.v1"
     assert "artifacts/ara_handoff.json" in payload["bundle_handoff_profiles"][0]["required_artifacts"]
+    assert any(profile["profile"] == "ara-production-open" for profile in payload["bundle_handoff_profiles"])
     assert payload["registries"]["datasets"] == "aira/registries/datasets.json"
     assert "python3 -m aira run-local-benchmark" in payload["entrypoints"]["direct_tools"]
     assert "python3 -m aira agent smoke" in payload["entrypoints"]["direct_tools"]
+    assert "python3 -m aira experiments run --profile production-open" in payload["entrypoints"]["direct_tools"]
 
 
 def test_registry_placeholders_are_local_and_deterministic():

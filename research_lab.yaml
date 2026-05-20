@@ -18,7 +18,9 @@ entrypoints:
     - python3 -m aira agent smoke
     - python3 -m aira agent production-smoke
     - python3 -m aira registry audit --profile production-local
+    - python3 -m aira registry audit --profile production-open
     - python3 -m aira experiments run --profile production-local
+    - python3 -m aira experiments run --profile production-open
     - python3 -m aira experiments evaluate
 commands:
   allow_prefixes:
@@ -46,6 +48,7 @@ artifacts:
     - runs/*/local_benchmark/**
     - runs/*/agent/**
     - runs/*/production_local/**
+    - runs/*/production_open/**
     - runs/*/production_ara/**
   exclude:
     - '**/__pycache__/**'
@@ -109,6 +112,30 @@ bundles:
         - memory/production_index/fingerprints.json
         - memory/production_index/outcomes.json
         - memory/production_index/reflections.json
+    - profile: ara-production-open
+      gate_profile: ara-public-bundle-reproduction-gate.v1
+      bundle_schema_version: ara.result_bundle.v1
+      validation_command: python3 -m aira bundles validate <bundle> --profile ara-production-open --json
+      smoke_command: python3 -m aira experiments run --profile production-open --plan tests/fixtures/production_open_plan.json --out <bundle> --json
+      dispatch:
+        lab_id: aira
+        manifest_path: research_lab.yaml
+        bundle_type: aira_result_bundle
+        profile: production-open
+        allowed_interfaces:
+          - research_lab.yaml
+          - aira_result_bundle
+      required_artifacts:
+        - bundle_manifest.json
+        - artifact_manifest.json
+        - claims.json
+        - artifacts/policy_report.json
+        - artifacts/execution_trace.json
+        - artifacts/task_summary.json
+        - artifacts/provenance.json
+        - artifacts/reproduction_status.json
+        - artifacts/run_ledger_entry.json
+        - memory/run_ledger.jsonl
 registries:
   datasets: aira/registries/datasets.json
   models: aira/registries/models.json
@@ -118,9 +145,9 @@ environment:
   optional: []
 safety:
   max_wall_time_minutes: 5
-  network_policy: none
+  network_policy: unrestricted
   destructive_commands: false
-  live_model_calls: false
+  live_model_calls: true
 profiles:
   production-local:
     runner: aira.production_runner
@@ -136,3 +163,19 @@ profiles:
       - operator_supplied_artifact
       - optional_external_disabled
     max_task_timeout_seconds: 30
+  production-open:
+    runner: aira.production_runner
+    command: python3 -m aira experiments run --profile production-open --plan <plan> --out <bundle> --json
+    registry_audit_command: python3 -m aira registry audit --profile production-open --json
+    network_policy: unrestricted
+    live_model_calls: true
+    external_datasets_required: true
+    gpu_required: true
+    package_installation: true
+    registry_adapters:
+      - local_cache
+      - operator_supplied_artifact
+      - external_dataset_download
+      - external_model_download
+      - hosted_model_api
+    max_task_timeout_seconds: 3600

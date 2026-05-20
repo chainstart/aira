@@ -45,6 +45,50 @@ def test_production_local_runner_emits_valid_bundle(tmp_path):
     assert metrics == {"accuracy": 1.0, "row_count": 4, "success": True}
 
 
+def test_production_open_runner_emits_valid_open_bundle(tmp_path):
+    output = tmp_path / "prod_open_bundle"
+    plan = "tests/fixtures/production_open_plan.json"
+
+    payload = run_production_experiment("production-open", plan, output)
+
+    assert payload["status"] == "passed"
+    assert payload["profile"] == "production-open"
+    assert payload["policy"]["allowed"] is True
+    assert [task["status"] for task in payload["tasks"]] == ["passed", "passed"]
+    assert [task["command_kind"] for task in payload["tasks"]] == ["inline_python", "external_command"]
+    assert payload["validation"]["valid"] is True
+
+    validation = validate_bundle(output, profile="ara-production-open")
+    manifest = json.loads((output / "bundle_manifest.json").read_text(encoding="utf-8"))
+    policy = json.loads((output / "artifacts" / "policy_report.json").read_text(encoding="utf-8"))
+    trace = json.loads((output / "artifacts" / "execution_trace.json").read_text(encoding="utf-8"))
+    open_report = json.loads(
+        (output / "artifacts" / "tasks" / "open_capability_report" / "open_capability_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    external_report = (
+        output / "artifacts" / "tasks" / "external_command_report" / "external_command_report.txt"
+    ).read_text(encoding="utf-8")
+
+    assert validation.valid
+    assert validation.metadata["validation_profile"] == "ara-production-open"
+    assert manifest["production_runner"]["profile"] == "production-open"
+    assert manifest["model_id"] == "production-open-python-runner-v1"
+    assert manifest["deterministic"] is False
+    assert manifest["network_required"] is True
+    assert manifest["external_datasets_required"] is True
+    assert manifest["gpu_required"] is True
+    assert manifest["live_model_calls"] is True
+    assert policy["allowed"] is True
+    assert trace["profile"]["network_policy"] == "unrestricted"
+    assert open_report["profile"] == "production-open"
+    assert open_report["network_policy"] == "unrestricted"
+    assert open_report["urllib_available"] is True
+    assert open_report["subprocess_available"] is True
+    assert external_report == "external command executed\n"
+
+
 def test_production_runner_cli_emits_json(tmp_path, capsys):
     output = tmp_path / "prod_cli_bundle"
 

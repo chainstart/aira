@@ -17,6 +17,9 @@ AIRA 是 ARA 生态中的 AI/ML 领域实验室。它负责 AI 研究所需的�
 - `python3 -m aira run-fixture-benchmark --out <dir> --json`：生成确定性 fixture benchmark bundle。
 - `python3 -m aira run-local-benchmark --out <dir> --json`：运行本地确定性文本分类 benchmark，生成含 provenance、ablation report、error analysis、run ledger 与 experiment memory 的 `aira_result_bundle`。
 - `python3 -m aira agent smoke --out <dir> --json`：生成 ARA handoff-ready 的确定性 agent bundle，包含 `artifacts/ara_handoff.json`、`artifacts/reproducibility_notes.md`、claims、provenance、ablation/error-analysis artifacts 和 bundle-local memory。
+- `python3 -m aira experiments run --profile production-local --plan <plan> --out <bundle> --json`：运行确定性 production-local 计划。
+- `python3 -m aira experiments run --profile production-open --plan <plan> --out <bundle> --json`：运行显式 open production 计划，可下载、使用外部数据集、安装 package、使用 GPU 和 live model/API。
+- `python3 -m aira registry audit --profile production-open --json`：审计 production-open dataset/model/benchmark registry surface。
 
 ## 3. Requirement ID
 
@@ -39,14 +42,14 @@ AIRA 是 ARA 生态中的 AI/ML 领域实验室。它负责 AI 研究所需的�
 原 ARA 中的 AI/ML 实验能力应迁入 AIRA，但必须分成两层：
 
 - 默认层：本地确定性 smoke/local benchmark，无网络、无 GPU、无 live model API，作为 CI 和 ARA public reproduction gate 的稳定输入。
-- 生产层：显式 profile，允许受控执行更重的 dataset/model/runner/evaluation 流程，并在 bundle 中记录资源、fingerprint、失败、统计检验和复现说明。
+- 生产层：显式 profile。`production-local` 保持确定性本地执行；`production-open` 恢复旧 ARA 生产实验的开放能力，允许下载、外部数据集、package install、GPU 和 live model/API，并在 bundle 中记录资源、fingerprint、失败、统计检验和复现说明。
 
 生产层迁移的最小完成标准：
 
 1. AIRA 能在受控 runner 中执行已声明的实验计划，并 materialize 数据、模型、日志、metrics、ablation、error-analysis 和统计检验 artifacts。
 2. Dataset/model registry 能区分 built-in fixture、local cache、外部下载和 operator-supplied artifact，并记录 fingerprint 与 license/资源策略。
 3. Experiment memory 能跨 run 检索失败、模型表现、dataset fingerprint 和 agent reflection。
-4. ARA 只能通过 manifest dispatch 与 result bundle 消费 AIRA production-local 输出，不能 import AIRA 内部实验代码。
+4. ARA 只能通过 manifest dispatch 与 result bundle 消费 AIRA production-local / production-open 输出，不能 import AIRA 内部实验代码。
 
 ## 5. 动态维护规则
 

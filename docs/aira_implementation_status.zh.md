@@ -16,17 +16,17 @@
 | --- | --- | --- | --- | --- |
 | `REQ-AIRA-GOV-001` | `completed` | 本文档、`.engineering/spec_tasks.yaml`、决策记录 | 需在后续任务中持续更新 | 接入 harness spec-sync |
 | `REQ-AIRA-MANIFEST-001` | `completed` | `research_lab.yaml`、`python3 -m aira labs inspect --json` | 随 ARA lab contract 演进 | 保持 manifest smoke |
-| `REQ-AIRA-REGISTRY-001` | `completed` | fixture/local registry、production-local dataset/model/benchmark entries、`python3 -m aira registry audit --profile production-local --json` | 生产 profile 下外部 adapter 仅登记为 disabled template，未启用下载或 live model | 后续在新 profile 中显式启用真实外部 adapter |
+| `REQ-AIRA-REGISTRY-001` | `completed` | fixture/local registry、production-local 与 production-open dataset/model/benchmark entries、`python3 -m aira registry audit --profile production-local --json`、`python3 -m aira registry audit --profile production-open --json` | 外部数据/模型许可、凭证、来源 fingerprint 仍需 operator 在真实 run 中声明 | 按真实实验增加 provider-specific adapter metadata |
 | `REQ-AIRA-BENCHMARK-001` | `completed` | `python3 -m aira run-local-benchmark --out <dir> --json`、local result bundle、provenance、ablation report、error analysis、run ledger | 仅覆盖小型本地确定性 benchmark，不含 GPU/外部数据/在线模型 | 增加更多本地 runner 和实验族 |
 | `REQ-AIRA-BUNDLE-001` | `completed` | bundle validator、fixture result bundle | 需要更多实验类型 schema | 扩展 result bundle schema |
 | `REQ-AIRA-AGENT-001` | `completed` | `python3 -m aira agent smoke --out <dir> --json`、agent plan/trace/observation/reflection artifacts、ablation/error-analysis observation | 仅执行已注册的本地确定性 benchmark | 增加更多本地 runner 后扩展 agent 选择策略 |
 | `REQ-AIRA-MEMORY-001` | `completed` | bundle-local memory artifacts、`python3 -m aira memory index --runs <bundle-or-parent> --out <dir> --json`、cross-run `memory_index.json`/`runs.jsonl`/`failures.jsonl`/fingerprint/outcome/reflection indexes | 当前是本地文件 index，不是远程共享 service；自动过期、失败重试执行和主动 agent planning 仍属后续能力 | 扩展 agent 使用 memory index 选择 production-local run |
 | `REQ-AIRA-ARA-001` | `completed` | ARA handoff-ready agent bundle、`artifacts/ara_handoff.json`、`artifacts/reproducibility_notes.md`、bundle validator 的 `ara_gate` profile | 仅证明本地确定性 bundle 可被 ARA public gate 消费；未接入 ARA 仓库端到端测试 | ARA contract 变更时同步更新 handoff profile |
-| `REQ-AIRA-PROD-RUNNER-001` | `completed` | `python3 -m aira experiments run --profile production-local --plan tests/fixtures/production_plan.json --out <dir> --json`、production-local bundle、policy report、execution trace、run ledger | 仅支持显式 `production-local` profile、本地 inline Python、无 package install/网络/GPU/live model API；容器级隔离仍属外部运行环境 | 后续接入生产 registry/evaluation/memory |
-| `REQ-AIRA-PROD-REGISTRY-001` | `completed` | production-local registry profile、local cache/operator-supplied/disabled optional external adapters、fingerprint/version/license/resource/reproducibility metadata、registry audit CLI | 未启用网络下载、GPU、live model API 或外部模型权重；operator artifact license 需由 operator attestation 提供 | `AIRA-PROD-EVAL-001` |
+| `REQ-AIRA-PROD-RUNNER-001` | `completed` | `production-local` 和 `production-open` runner；open profile 允许 external command、package install、网络下载、外部数据集、GPU 和 live model/API；bundle 写出 policy report、execution trace、provenance、run ledger | 容器级隔离、凭证管理和大规模 GPU 调度仍属外部运行环境 | 按真实 benchmark 增加 provider/hardware attestation |
+| `REQ-AIRA-PROD-REGISTRY-001` | `completed` | production-local registry profile；production-open registry profile；external dataset download、production-open runner、hosted model API adapter；fingerprint/version/license/resource/reproducibility metadata、registry audit CLI | 真实外部 artifact 的 license、credential 和 source fingerprint 需由 operator 或 provider adapter 填充 | 扩展具体数据/模型 provider adapter |
 | `REQ-AIRA-PROD-EVAL-001` | `completed` | `python3 -m aira experiments evaluate --bundle <bundle> --json`、production evaluation metrics、ablation matrix、error taxonomy、exact paired statistical tests、report summary artifacts | 当前 evaluator 只消费 bundle 内已物化的 prediction CSV；ablation 是确定性 failure-keyword 禁用对比，不训练或调用 live model；小 fixture 的 exact test 统计功效有限 | `AIRA-PROD-MEMORY-001` |
 | `REQ-AIRA-PROD-MEMORY-001` | `completed` | `python3 -m aira memory index --runs /tmp/aira_prod_runner_bundle --out /tmp/aira_prod_memory --json`、失败 ledger、fingerprint index、dataset/model outcome matrix、agent reflection retrieval | lifecycle 目前是 rebuild/status/max-run filter；未提供远程 service、自动 expiry 或自动 retry execution | `AIRA-PROD-ARA-001` |
-| `REQ-AIRA-PROD-ARA-001` | `completed` | `python3 -m aira agent production-smoke --out <dir> --json`、`python3 -m aira bundles validate <bundle> --profile ara-production --json`、`research_lab.yaml` 的 `ara-production` handoff profile | 仍为 production-local smoke；不启用网络、GPU、外部数据集、package install 或 live model API | ARA contract 变更时同步更新 production handoff profile |
+| `REQ-AIRA-PROD-ARA-001` | `completed` | `ara-production` 与 `ara-production-open` validation profiles；`research_lab.yaml` 暴露 production-local 和 production-open handoff；`python3 -m aira bundles validate <bundle> --profile ara-production-open --json` | production-open run 非确定性，发布级论文仍需记录外部数据、模型/API、GPU、package 和 license attestations | ARA contract 变更时同步更新 production handoff profile |
 
 ## 维护流程
 
@@ -50,11 +50,11 @@
 
 生产级迁移用于承接原 ARA 旧 AI/ML 实验执行能力，不改变默认 smoke 的确定性边界。执行顺序交给 `engineering-harness`：
 
-1. `AIRA-PROD-RUNNER-001`：已迁移旧 ARA 实验执行安全边界，形成 AIRA `production-local` controlled runner。
-2. `AIRA-PROD-REGISTRY-001`：已扩展 dataset/model/benchmark registry，支持 local cache、operator-supplied artifacts、disabled optional external adapter contract、fingerprint、versioning、license/resource policy 和 reproducibility notes。
+1. `AIRA-PROD-RUNNER-001`：已迁移旧 ARA 实验执行边界，形成 AIRA `production-local` 和 `production-open` runner；open profile 显式允许下载、外部数据集、package install、GPU、live model/API 和 external command。
+2. `AIRA-PROD-REGISTRY-001`：已扩展 dataset/model/benchmark registry，支持 local cache、operator-supplied artifacts、production-open external dataset download、hosted model API adapter、fingerprint、versioning、license/resource policy 和 reproducibility notes。
 3. `AIRA-PROD-EVAL-001`：已迁移 statistical testing、ablation、error analysis 和报告 artifacts。
 4. `AIRA-PROD-MEMORY-001`：已建立跨 run experiment memory、失败 ledger、fingerprint/outcome index 与 agent reflection 检索。
-5. `AIRA-PROD-ARA-001`：发布 ARA production-local handoff profile，使 ARA 只通过 manifest 和 bundle contract 消费生产实验输出。
+5. `AIRA-PROD-ARA-001`：发布 ARA production-local 与 production-open handoff profile，使 ARA 只通过 manifest 和 bundle contract 消费生产实验输出。
 
 ## Production ARA Handoff
 
@@ -88,6 +88,16 @@
 - resource bounds：每个 task 使用 subprocess timeout、CPU thread 环境变量和 stdout/stderr 截断。
 - failure isolation：task 在 `work/tasks/<task_id>` 下独立执行；失败 task 的 dependent task 会被标记为 skipped。
 - artifact materialization：声明输出被复制到 `artifacts/tasks/<task_id>/`，并写入 `artifact_manifest.json`、`artifacts/policy_report.json`、`artifacts/execution_trace.json`、`artifacts/task_summary.json`、`artifacts/provenance.json`、`artifacts/reproduction_status.json`、`artifacts/run_ledger_entry.json` 和 `memory/run_ledger.jsonl`。
+
+## Production-Open Runner
+
+`python3 -m aira experiments run --profile production-open --plan <plan.json> --out <dir> --json` 是恢复旧 ARA 生产级实验自由度的显式入口：
+
+- resource gates：允许 `network_required`、`external_datasets_required`、`gpu_required` 和 `live_model_calls` 为 true。
+- command surface：支持 `inline_python`、`external_command`、`shell_command` 和 `command`，仍阻断破坏性命令和密钥类危险模式。
+- package install：允许 plan 声明 Python package，由 runner 在执行前安装并记录 policy 状态。
+- registry：`production-open` registry 包含 external dataset download、production-open runner 和 hosted model API adapter。
+- bundle validation：`ara-production-open` profile 接受非 deterministic bundle，但要求显式声明 open resource flags、production runner profile、policy/trace/provenance/reproduction/ledger artifacts。
 
 ## Production Evaluation
 

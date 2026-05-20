@@ -10,6 +10,8 @@ from typing import Any
 
 REGISTRY_SCHEMA_VERSION = "aira.registry.v1"
 PRODUCTION_PROFILE = "production-local"
+PRODUCTION_OPEN_PROFILE = "production-open"
+PRODUCTION_PROFILES = {PRODUCTION_PROFILE, PRODUCTION_OPEN_PROFILE}
 PRODUCTION_REGISTRY_SCHEMA_VERSION = "aira.production_registry.v1"
 
 
@@ -492,6 +494,189 @@ PRODUCTION_BENCHMARKS: list[dict[str, Any]] = [
 ]
 
 
+PRODUCTION_OPEN_DATASETS: list[dict[str, Any]] = [
+    {
+        "id": "external-download-dataset-adapter-v1",
+        "name": "External dataset download adapter",
+        "status": "production_open",
+        "source": "external_download",
+        "profile": PRODUCTION_OPEN_PROFILE,
+        "version": "1.0.0",
+        "versioning": {
+            "scheme": "content_addressed_when_available",
+            "stability": "operator controlled",
+            "change_policy": "Downloaded datasets must record source URL, license, retrieval time, and fingerprints when available.",
+        },
+        "adapter": {
+            "type": "optional_external",
+            "enabled": True,
+            "network_required": True,
+            "activation_policy": "enabled_by_production_open_profile",
+        },
+        "fingerprint": _fingerprint("dataset", "external-download-dataset-adapter-v1", "1.0.0"),
+        "license_policy": {
+            "default_license": "source_declared",
+            "requires_operator_attestation": True,
+            "redistribution_allowed": "source_license_defined",
+        },
+        "resource_policy": {
+            "storage": "download_or_cache",
+            "network_required": True,
+            "external_datasets_required": True,
+            "gpu_required": False,
+            "max_size_mb": "operator_declared",
+        },
+        "reproducibility_notes": [
+            "Production-open permits remote dataset downloads and records retrieval metadata in the result bundle.",
+            "Operators must preserve source URL, license, and fingerprints for publishable claims.",
+        ],
+        "network_required": True,
+        "external_datasets_required": True,
+        "intended_use": "Download and use external datasets for unrestricted AIRA experiments.",
+    }
+]
+
+
+PRODUCTION_OPEN_MODELS: list[dict[str, Any]] = [
+    {
+        "id": "production-open-python-runner-v1",
+        "name": "Production-open Python and command runner",
+        "status": "production_open",
+        "profile": PRODUCTION_OPEN_PROFILE,
+        "version": "1.0.0",
+        "versioning": {
+            "scheme": "semver",
+            "stability": "profile pinned",
+            "change_policy": "Execution surface changes require a new runner fingerprint.",
+        },
+        "implementation": "aira.production_runner.run_production_experiment",
+        "adapter": {
+            "type": "builtin_runner",
+            "enabled": True,
+            "network_required": True,
+            "live_model_calls": True,
+        },
+        "fingerprint": _fingerprint("model", "production-open-python-runner-v1", "1.0.0"),
+        "license_policy": {
+            "default_license": "project_license",
+            "requires_operator_attestation": False,
+            "redistribution_allowed": True,
+        },
+        "resource_policy": {
+            "network_required": True,
+            "gpu_required": True,
+            "live_model_calls": True,
+            "package_installation": True,
+            "max_cpu_threads": "host_available",
+            "max_task_timeout_seconds": 3600,
+        },
+        "reproducibility_notes": [
+            "The production-open runner can install packages, run command tasks, download data or models, use GPU, and call live model APIs.",
+            "Runs are not assumed deterministic; bundles must capture versions, fingerprints, and external service metadata.",
+        ],
+        "live_model_calls": True,
+        "network_required": True,
+        "gpu_required": True,
+        "intended_use": "Execute unrestricted AIRA AI/ML experiment plans.",
+    },
+    {
+        "id": "hosted-model-api-adapter-v1",
+        "name": "Hosted model API adapter",
+        "status": "production_open",
+        "profile": PRODUCTION_OPEN_PROFILE,
+        "version": "1.0.0",
+        "implementation": "operator_configured_hosted_api",
+        "adapter": {
+            "type": "hosted_model_api",
+            "enabled": True,
+            "network_required": True,
+            "activation_policy": "operator_supplied_credentials",
+        },
+        "fingerprint": _fingerprint("model", "hosted-model-api-adapter-v1", "1.0.0"),
+        "license_policy": {
+            "default_license": "provider_terms",
+            "requires_operator_attestation": True,
+            "redistribution_allowed": "provider_terms_defined",
+        },
+        "resource_policy": {
+            "network_required": True,
+            "gpu_required": False,
+            "live_model_calls": True,
+            "package_installation": True,
+        },
+        "reproducibility_notes": [
+            "Hosted model calls must record provider, model id, version/date, request parameters, and response fingerprints where possible.",
+        ],
+        "live_model_calls": True,
+        "network_required": True,
+        "gpu_required": False,
+        "intended_use": "Call externally hosted models during production-open experiments.",
+    },
+]
+
+
+PRODUCTION_OPEN_BENCHMARKS: list[dict[str, Any]] = [
+    {
+        "id": "production-open-plan-execution",
+        "name": "AIRA production-open plan execution benchmark",
+        "status": "production_open",
+        "profile": PRODUCTION_OPEN_PROFILE,
+        "version": "1.0.0",
+        "versioning": {
+            "scheme": "semver",
+            "stability": "profile pinned",
+            "change_policy": "Plan schema, open-profile policy, or emitted artifact contract changes require a new fingerprint.",
+        },
+        "dataset_id": "external-download-dataset-adapter-v1",
+        "model_ids": [
+            "production-open-python-runner-v1",
+            "hosted-model-api-adapter-v1",
+        ],
+        "metric_ids": ["task_count", "passed_task_count", "failed_task_count", "skipped_task_count"],
+        "adapter": {
+            "type": "production_open_runner",
+            "enabled": True,
+            "network_required": True,
+            "entrypoint": "python3 -m aira experiments run --profile production-open",
+        },
+        "fingerprint": _fingerprint("benchmark", "production-open-plan-execution", "1.0.0"),
+        "license_policy": {
+            "default_license": "operator_supplied",
+            "requires_operator_attestation": True,
+            "redistribution_allowed": "operator_defined",
+        },
+        "resource_policy": {
+            "network_required": True,
+            "external_datasets_required": True,
+            "gpu_required": True,
+            "live_model_calls": True,
+            "package_installation": True,
+            "max_task_timeout_seconds": 3600,
+            "max_cpu_threads": "host_available",
+        },
+        "reproducibility_notes": [
+            "Production-open intentionally restores the broad legacy ARA experiment surface inside AIRA.",
+            "Bundles must record external source, package, model/API, and hardware metadata for publishable claims.",
+        ],
+        "network_required": True,
+        "external_datasets_required": True,
+        "gpu_required": True,
+        "live_model_calls": True,
+        "emits_bundle_type": "aira_result_bundle",
+        "emits_artifact_kinds": [
+            "production_plan",
+            "policy_report",
+            "execution_trace",
+            "task_summary",
+            "provenance",
+            "reproduction_status",
+            "run_ledger",
+        ],
+        "entrypoint": "python3 -m aira experiments run --profile production-open",
+    }
+]
+
+
 def _canonical_digest(payload: Any) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
@@ -501,19 +686,25 @@ def registry_payload(profile: str | None = None) -> dict[str, Any]:
     """Return registry entries as JSON-serializable data.
 
     The default payload intentionally preserves the fixture/local registry view.
-    Production entries are included only through the explicit production-local
-    profile to keep existing deterministic smoke behavior stable.
+    Production entries are included only through explicit production profiles to
+    keep deterministic smoke behavior stable while allowing production-open runs
+    to opt into external resources.
     """
     requested_profile = profile or "default"
     datasets = deepcopy(DATASETS)
     models = deepcopy(MODELS)
     benchmarks = deepcopy(BENCHMARKS)
     if requested_profile != "default":
-        if requested_profile != PRODUCTION_PROFILE:
+        if requested_profile not in PRODUCTION_PROFILES:
             raise ValueError(f"Unsupported registry profile: {profile}.")
-        datasets.extend(deepcopy(PRODUCTION_DATASETS))
-        models.extend(deepcopy(PRODUCTION_MODELS))
-        benchmarks.extend(deepcopy(PRODUCTION_BENCHMARKS))
+        if requested_profile == PRODUCTION_PROFILE:
+            datasets.extend(deepcopy(PRODUCTION_DATASETS))
+            models.extend(deepcopy(PRODUCTION_MODELS))
+            benchmarks.extend(deepcopy(PRODUCTION_BENCHMARKS))
+        else:
+            datasets.extend(deepcopy(PRODUCTION_OPEN_DATASETS))
+            models.extend(deepcopy(PRODUCTION_OPEN_MODELS))
+            benchmarks.extend(deepcopy(PRODUCTION_OPEN_BENCHMARKS))
     return {
         "schema_version": REGISTRY_SCHEMA_VERSION,
         "profile": requested_profile,
@@ -523,8 +714,8 @@ def registry_payload(profile: str | None = None) -> dict[str, Any]:
     }
 
 
-def production_registry_payload() -> dict[str, Any]:
-    return registry_payload(PRODUCTION_PROFILE)
+def production_registry_payload(profile: str = PRODUCTION_PROFILE) -> dict[str, Any]:
+    return registry_payload(profile)
 
 
 def _entry_id(entry: dict[str, Any]) -> str:
@@ -554,6 +745,14 @@ def _check_required_metadata(kind: str, entry: dict[str, Any], errors: list[str]
 
 def _check_production_policy(kind: str, entry: dict[str, Any], errors: list[str], checks: list[dict[str, Any]]) -> None:
     entry_id = _entry_id(entry)
+    if entry.get("profile") == PRODUCTION_OPEN_PROFILE:
+        resource_policy = entry.get("resource_policy", {})
+        if not isinstance(resource_policy, dict):
+            errors.append(f"{kind} {entry_id} is missing a production-open resource policy.")
+            checks.append({"id": f"{kind}:{entry_id}:policy", "status": "fail"})
+            return
+        checks.append({"id": f"{kind}:{entry_id}:policy", "status": "pass", "open_profile": True})
+        return
     resource_policy = entry.get("resource_policy", {})
     blocked_flags = {
         "network_required": entry.get("network_required"),
@@ -581,8 +780,8 @@ def _check_production_policy(kind: str, entry: dict[str, Any], errors: list[str]
 
 
 def audit_registry(profile: str) -> dict[str, Any]:
-    """Audit a registry profile for production-local reproducibility metadata."""
-    if profile != PRODUCTION_PROFILE:
+    """Audit a registry profile for production reproducibility metadata."""
+    if profile not in PRODUCTION_PROFILES:
         return {
             "schema_version": PRODUCTION_REGISTRY_SCHEMA_VERSION,
             "profile": profile,
@@ -593,21 +792,21 @@ def audit_registry(profile: str) -> dict[str, Any]:
             "checks": [],
         }
 
-    payload = production_registry_payload()
+    payload = production_registry_payload(profile)
     errors: list[str] = []
     warnings: list[str] = []
     checks: list[dict[str, Any]] = []
     datasets = {_entry_id(entry): entry for entry in payload["datasets"]}
     models = {_entry_id(entry): entry for entry in payload["models"]}
     production_entries = {
-        "dataset": [entry for entry in payload["datasets"] if entry.get("profile") == PRODUCTION_PROFILE],
-        "model": [entry for entry in payload["models"] if entry.get("profile") == PRODUCTION_PROFILE],
-        "benchmark": [entry for entry in payload["benchmarks"] if entry.get("profile") == PRODUCTION_PROFILE],
+        "dataset": [entry for entry in payload["datasets"] if entry.get("profile") == profile],
+        "model": [entry for entry in payload["models"] if entry.get("profile") == profile],
+        "benchmark": [entry for entry in payload["benchmarks"] if entry.get("profile") == profile],
     }
 
     for kind, entries in production_entries.items():
         if not entries:
-            errors.append(f"No production-local {kind} entries are registered.")
+            errors.append(f"No {profile} {kind} entries are registered.")
             checks.append({"id": f"{kind}:presence", "status": "fail"})
             continue
         checks.append({"id": f"{kind}:presence", "status": "pass", "count": len(entries)})
@@ -621,7 +820,12 @@ def audit_registry(profile: str) -> dict[str, Any]:
         for entry in entries
         if isinstance(entry.get("adapter"), dict)
     }
-    for required_adapter in ("local_cache", "operator_supplied_artifact", "optional_external"):
+    required_adapters = (
+        ("local_cache", "operator_supplied_artifact", "optional_external")
+        if profile == PRODUCTION_PROFILE
+        else ("optional_external", "builtin_runner", "hosted_model_api", "production_open_runner")
+    )
+    for required_adapter in required_adapters:
         if required_adapter not in adapter_types:
             errors.append(f"Production registry is missing adapter type: {required_adapter}.")
             checks.append({"id": f"adapter:{required_adapter}", "status": "fail"})
