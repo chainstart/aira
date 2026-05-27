@@ -1,6 +1,6 @@
 # AIRA Spec 实现状态矩阵
 
-日期：2026-05-20
+日期：2026-05-21
 
 状态：动态维护中
 
@@ -27,6 +27,7 @@
 | `REQ-AIRA-PROD-EVAL-001` | `completed` | `python3 -m aira experiments evaluate --bundle <bundle> --json`、production evaluation metrics、ablation matrix、error taxonomy、exact paired statistical tests、report summary artifacts | 当前 evaluator 只消费 bundle 内已物化的 prediction CSV；ablation 是确定性 failure-keyword 禁用对比，不训练或调用 live model；小 fixture 的 exact test 统计功效有限 | `AIRA-PROD-MEMORY-001` |
 | `REQ-AIRA-PROD-MEMORY-001` | `completed` | `python3 -m aira memory index --runs /tmp/aira_prod_runner_bundle --out /tmp/aira_prod_memory --json`、失败 ledger、fingerprint index、dataset/model outcome matrix、agent reflection retrieval | lifecycle 目前是 rebuild/status/max-run filter；未提供远程 service、自动 expiry 或自动 retry execution | `AIRA-PROD-ARA-001` |
 | `REQ-AIRA-PROD-ARA-001` | `completed` | `ara-production` 与 `ara-production-open` validation profiles；`research_lab.yaml` 暴露 production-local 和 production-open handoff；`python3 -m aira bundles validate <bundle> --profile ara-production-open --json` | production-open run 非确定性，发布级论文仍需记录外部数据、模型/API、GPU、package 和 license attestations | ARA contract 变更时同步更新 production handoff profile |
+| `REQ-AIRA-ARA-DEEPENING-001` | `completed` | `python3 -m aira experiments deepen --profile production-open --task <task> --source-bundle <bundle> --out <bundle> --json`；`experiments build-deepening-plan`；`research_lab.yaml` 的 `ara-production-open` profile 已改为接收 ARA task package/source bundle；产出 `primary_contribution`、`mechanism_insight`、`artifact_availability`、`top_venue_evidence` 和 `deepening_report` artifacts | 该入口把 ARA evidence gap 转成 claim-boundary 和补强 artifacts；若 ARA 继续报告大规模 benchmark/ablation/uncertainty 缺口，仍需领域专用 plan 扩大真实实验 | 按具体研究问题扩展 AIRA benchmark-expansion strategy |
 
 ## 维护流程
 
@@ -55,6 +56,7 @@
 3. `AIRA-PROD-EVAL-001`：已迁移 statistical testing、ablation、error analysis 和报告 artifacts。
 4. `AIRA-PROD-MEMORY-001`：已建立跨 run experiment memory、失败 ledger、fingerprint/outcome index 与 agent reflection 检索。
 5. `AIRA-PROD-ARA-001`：发布 ARA production-local 与 production-open handoff profile，使 ARA 只通过 manifest 和 bundle contract 消费生产实验输出。
+6. `AIRA-ARA-DEEPENING-001`：接入 ARA top-venue closed loop，AIRA 可消费 `ara.research_deepening_task_package.v1`，生成并运行 follow-up production plan，输出可被 ARA rescoring 的补强 bundle。
 
 ## Production ARA Handoff
 
@@ -98,6 +100,16 @@
 - package install：允许 plan 声明 Python package，由 runner 在执行前安装并记录 policy 状态。
 - registry：`production-open` registry 包含 external dataset download、production-open runner 和 hosted model API adapter。
 - bundle validation：`ara-production-open` profile 接受非 deterministic bundle，但要求显式声明 open resource flags、production runner profile、policy/trace/provenance/reproduction/ledger artifacts。
+
+## ARA Deepening Runner
+
+`python3 -m aira experiments deepen --profile production-open --task <task.json> --source-bundle <bundle> --out <dir> --json` 是面向 ARA 闭环的补强入口：
+
+- 输入：ARA 生成的 `ara.research_deepening_task_package.v1`，以及可选 source result bundle。
+- 转换：AIRA 生成 `aira.ara_deepening_plan.v1` production plan，并通过现有 production runner 执行。
+- 输出：补强 bundle 包含 `ara_deepening_task`、`primary_contribution`、`mechanism_insight`、`artifact_availability`、`top_venue_evidence` 和 `deepening_report` artifacts。
+- Claim：plan 可声明 claim、limitations、writing brief；production runner 会把这些写入 `claims.json`、`writing_brief.md` 和 `limitations.md`，并仍保留 policy/trace/provenance/reproduction/ledger artifacts。
+- ARA contract：`research_lab.yaml` 的 `ara-production-open` handoff profile 已改为 `experiments deepen`，并通过 `<task>`、`<source_bundle>`、`<bundle>` 占位符接收 ARA 闭环参数。
 
 ## Production Evaluation
 

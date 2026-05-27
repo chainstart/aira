@@ -21,6 +21,8 @@ entrypoints:
     - python3 -m aira registry audit --profile production-open
     - python3 -m aira experiments run --profile production-local
     - python3 -m aira experiments run --profile production-open
+    - python3 -m aira experiments deepen --profile production-open
+    - python3 -m aira experiments build-deepening-plan
     - python3 -m aira experiments evaluate
 commands:
   allow_prefixes:
@@ -116,7 +118,7 @@ bundles:
       gate_profile: ara-public-bundle-reproduction-gate.v1
       bundle_schema_version: ara.result_bundle.v1
       validation_command: python3 -m aira bundles validate <bundle> --profile ara-production-open --json
-      smoke_command: python3 -m aira experiments run --profile production-open --plan tests/fixtures/production_open_plan.json --out <bundle> --json
+      smoke_command: python3 -m aira experiments deepen --profile production-open --task <task> --source-bundle <source_bundle> --out <bundle> --json
       dispatch:
         lab_id: aira
         manifest_path: research_lab.yaml

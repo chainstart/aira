@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Produce a validated `aira_result_bundle` result bundle.",
+    "Every new or strengthened claim must cite declared artifacts.",
+    "Limitations must preserve any still-open evidence gap."
+  ],
+  "claim_id": "fixture-c1",
+  "claim_text": "A verifier-assisted conformal test-time compute policy improves the risk-coverage tradeoff for selective LLM reasoning.",
+  "command_name": "bundle-execution",
+  "contribution_type": "empirical",
+  "dispatch_mode": "production-open",
+  "dispatch_status": "ready",
+  "domain_id": "ai_ml",
+  "executable": true,
+  "expected_bundle_type": "aira_result_bundle",
+  "goal": "Deepen `Artificial Intelligence / Machine Learning` evidence for `Top AI/ML Conference`. Target claim: A verifier-assisted conformal test-time compute policy improves the risk-coverage tradeoff for selective LLM reasoning. Close evidence gaps: clear_primary_contribution, broad_or_deep_insight, artifact_availability.",
+  "lab_id": "aira",
+  "lab_kind": "domain_lab",
+  "missing_evidence": [
+    "clear_primary_contribution",
+    "broad_or_deep_insight",
+    "artifact_availability"
+  ],
+  "schema_version": "ara.research_deepening_task_package.v1",
+  "task_id": "deepen-fixture-c1",
+  "writing_instruction": "Do not promote this claim in formal writing until a validated follow-up bundle closes the gap."
+}

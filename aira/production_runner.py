@@ -161,7 +161,7 @@ def production_open_profile() -> ProductionProfile:
         schema_version=PROFILE_SCHEMA_VERSION,
         name="production-open",
         max_tasks=64,
-        task_timeout_seconds=3600,
+        task_timeout_seconds=24 * 3600,
         max_stdout_bytes=500_000,
         max_stderr_bytes=500_000,
         max_output_files_per_task=256,
@@ -601,6 +601,73 @@ def _profile_limitations(profile: ProductionProfile, flags: dict[str, bool]) -> 
     ]
 
 
+def _plan_limitations(plan: dict[str, Any], profile: ProductionProfile, flags: dict[str, bool]) -> list[str]:
+    limitations = [str(item).strip() for item in plan.get("limitations", []) or [] if str(item).strip()]
+    limitations.extend(_profile_limitations(profile, flags))
+    return list(dict.fromkeys(limitations))
+
+
+def _plan_claims(plan: dict[str, Any], *, status: str, profile: ProductionProfile, limitations: list[str]) -> list[dict[str, Any]]:
+    claims = plan.get("claims")
+    if isinstance(claims, list) and claims:
+        normalized: list[dict[str, Any]] = []
+        for index, claim in enumerate(claims):
+            if not isinstance(claim, dict):
+                continue
+            claim_id = str(claim.get("claim_id") or claim.get("id") or f"aira-plan-claim-{index + 1}").strip()
+            claim_text = str(claim.get("claim") or claim.get("text") or "").strip()
+            if not claim_id or not claim_text:
+                continue
+            item = dict(claim)
+            item["claim_id"] = claim_id
+            item["claim"] = claim_text
+            item.setdefault("status", "confirmed" if status == "passed" else "observed")
+            item.setdefault("reproduction_status", "reproduced" if status == "passed" else "failed")
+            supported_by = item.get("supported_by", item.get("artifacts"))
+            item["supported_by"] = [str(ref).strip() for ref in supported_by or [] if str(ref).strip()]
+            item.setdefault("limitations", limitations)
+            normalized.append(item)
+        if normalized:
+            return normalized
+
+    claim_status = "confirmed" if status == "passed" else "observed"
+    return [
+        {
+            "claim_id": "aira-production-runner-c1",
+            "claim": (
+                f"The AIRA {profile.name} runner executed a policy-checked experiment plan "
+                "with explicit profile gating, resource accounting, failure isolation, and materialized artifacts."
+            ),
+            "status": claim_status,
+            "reproduction_status": "reproduced" if status == "passed" else "failed",
+            "supported_by": [
+                "reproduction_status",
+                "policy_report",
+                "execution_trace",
+                "task_summary",
+                "provenance",
+                "run_ledger_entry",
+            ],
+            "limitations": limitations,
+        }
+    ]
+
+
+def _writing_brief(plan: dict[str, Any], profile: ProductionProfile) -> str:
+    brief = str(plan.get("writing_brief_markdown") or plan.get("writing_brief") or "").strip()
+    if brief:
+        return brief.rstrip() + "\n"
+    return "\n".join(
+        [
+            f"# AIRA {profile.name} Runner",
+            "",
+            f"This bundle records an AIRA `{profile.name}` experiment runner invocation.",
+            "It is intended to move script execution responsibility from legacy ARA into AIRA while preserving artifact, provenance, and claim-boundary records.",
+            "",
+        ]
+    )
+
+
 def _write_bundle(
     *,
     out: Path,
@@ -626,7 +693,7 @@ def _write_bundle(
         or flags["gpu_required"]
         or flags["live_model_calls"]
     )
-    limitations = _profile_limitations(profile, flags)
+    limitations = _plan_limitations(plan, profile, flags)
     status = "passed" if policy.allowed and all(task["status"] == "passed" for task in task_records) else "failed"
     task_summary = {
         "schema_version": "aira.production_task_summary.v1",
@@ -823,44 +890,11 @@ def _write_bundle(
             },
         },
     )
-    claim_status = "confirmed" if status == "passed" else "observed"
     write_json(
         out / "claims.json",
-        {
-            "claims": [
-                {
-                    "claim_id": "aira-production-runner-c1",
-                    "claim": (
-                        f"The AIRA {profile.name} runner executed a policy-checked experiment plan "
-                        "with explicit profile gating, resource accounting, failure isolation, and materialized artifacts."
-                    ),
-                    "status": claim_status,
-                    "reproduction_status": "reproduced" if status == "passed" else "failed",
-                    "supported_by": [
-                        "reproduction_status",
-                        "policy_report",
-                        "execution_trace",
-                        "task_summary",
-                        "provenance",
-                        "run_ledger_entry",
-                    ],
-                    "limitations": limitations,
-                }
-            ]
-        },
+        {"claims": _plan_claims(plan, status=status, profile=profile, limitations=limitations)},
     )
-    (out / "writing_brief.md").write_text(
-        "\n".join(
-            [
-                f"# AIRA {profile.name} Runner",
-                "",
-                f"This bundle records an AIRA `{profile.name}` experiment runner invocation.",
-                "It is intended to move script execution responsibility from legacy ARA into AIRA while preserving artifact, provenance, and claim-boundary records.",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
+    (out / "writing_brief.md").write_text(_writing_brief(plan, profile), encoding="utf-8")
     (out / "limitations.md").write_text(
         "\n".join(["# Limitations", "", *[f"- {item}" for item in limitations], ""]),
         encoding="utf-8",

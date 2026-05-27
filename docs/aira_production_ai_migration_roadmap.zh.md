@@ -1,6 +1,6 @@
 # AIRA 生产级 AI 实验迁移路线图
 
-日期：2026-05-20
+日期：2026-05-21
 
 本文把“从 ARA 迁出旧 AI/ML 实验执行能力”拆成可由 `engineering-harness` 实施的任务包。当前 AIRA 已具备本地确定性 benchmark/agent MVP；生产级能力仍未完成。
 
@@ -18,7 +18,8 @@
 | 2 | `AIRA-PROD-REGISTRY-001` | `REQ-AIRA-PROD-REGISTRY-001` | completed | local cache、operator-supplied artifact、可选外部 adapter、fingerprint、license/resource policy |
 | 3 | `AIRA-PROD-EVAL-001` | `REQ-AIRA-PROD-EVAL-001` | completed | metrics、ablation matrix、error taxonomy、statistical tests、机器可读报告 |
 | 4 | `AIRA-PROD-MEMORY-001` | `REQ-AIRA-PROD-MEMORY-001` | completed | 本地跨 run index、失败台账、dataset/model outcome 检索、agent reflection |
-| 5 | `AIRA-PROD-ARA-001` | `REQ-AIRA-PROD-ARA-001` | completed | `research_lab.yaml` production-local dispatch、`ara-production` bundle validation、ARA handoff notes |
+| 5 | `AIRA-PROD-ARA-001` | `REQ-AIRA-PROD-ARA-001` | completed | `research_lab.yaml` production-local/open dispatch、`ara-production` / `ara-production-open` bundle validation、ARA handoff notes |
+| 6 | `AIRA-ARA-DEEPENING-001` | `REQ-AIRA-ARA-DEEPENING-001` | completed | 消费 ARA deepening task，生成 follow-up production plan，输出可被 ARA rescoring 的 evidence-deepening bundle |
 
 ## 不回迁到 ARA 的内容
 
@@ -43,3 +44,15 @@ ARA 只保留 manifest dispatch、bundle validation、claim/evidence/reproductio
 已新增 `python3 -m aira agent production-smoke --out <bundle> --json`。该 smoke 会执行 `production-local` runner、追加 production evaluation、生成 bundle-local memory index，并写入 `artifacts/ara_handoff.json` 与 `artifacts/reproducibility_notes.md`。
 
 `research_lab.yaml` 现在声明 `ara-production` handoff profile；ARA 只需要读取 `research_lab.yaml` 与 `aira_result_bundle`，再调用 `python3 -m aira bundles validate <bundle> --profile ara-production --json`。该 profile 会检查 production runner/evaluation、policy/trace/task summary、run ledger、production memory index、dispatch metadata 与必需 gate inputs。
+
+## AIRA-ARA-DEEPENING-001 结果
+
+已新增 `python3 -m aira experiments deepen --profile production-open --task <task.json> --source-bundle <bundle> --out <bundle> --json`，用于承接 ARA 顶会闭环的 evidence gap 补强任务。该入口会：
+
+- 读取 ARA 的 `ara.research_deepening_task_package.v1`。
+- 生成 `aira.ara_deepening_plan.v1` production plan。
+- 调用既有 `production-open` runner 执行补强任务。
+- 输出 `primary_contribution`、`mechanism_insight`、`artifact_availability`、`top_venue_evidence`、`deepening_report` 等 artifacts。
+- 让 `claims.json` 引用上述 artifacts 和 reproduction/policy/trace/provenance/ledger artifacts，供 ARA 重新执行 claim/evidence scoring。
+
+`research_lab.yaml` 的 `ara-production-open` profile 已从固定 fixture plan 改为 `experiments deepen`，并接收 ARA 传入的 `<task>`、`<source_bundle>` 和 `<bundle>`。这使 ARA 的 `top-venue improve-loop` 能把每轮失败的证据缺口真正交给 AIRA 生成 follow-up bundle，而不是重复执行固定 smoke plan。

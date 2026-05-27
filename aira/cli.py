@@ -12,6 +12,7 @@ from aira import __version__
 from aira.agent import run_agent_smoke, run_production_agent_smoke
 from aira.benchmark import write_fixture_bundle, write_local_benchmark_bundle
 from aira.bundles import validate_bundle
+from aira.deepening import build_ara_deepening_plan, run_ara_deepening_experiment
 from aira.manifest import DEFAULT_MANIFEST_PATH, load_manifest
 from aira.memory import build_memory_index
 from aira.migration import build_inventory
@@ -115,6 +116,24 @@ def build_parser() -> argparse.ArgumentParser:
     experiments_run.add_argument("--plan", required=True, help="Production plan JSON path.")
     experiments_run.add_argument("--out", required=True, help="Output bundle directory.")
     experiments_run.add_argument("--json", action="store_true", help="Print JSON output.")
+    experiments_deepen = experiments_sub.add_parser(
+        "deepen",
+        help="Generate and run an AIRA follow-up bundle from an ARA research-deepening task.",
+    )
+    experiments_deepen.add_argument("--profile", required=True, help="Experiment execution profile.")
+    experiments_deepen.add_argument("--task", required=True, help="ARA research-deepening task package JSON path.")
+    experiments_deepen.add_argument("--source-bundle", help="Optional source AIRA result bundle being deepened.")
+    experiments_deepen.add_argument("--out", required=True, help="Output bundle directory.")
+    experiments_deepen.add_argument("--json", action="store_true", help="Print JSON output.")
+    experiments_plan = experiments_sub.add_parser(
+        "build-deepening-plan",
+        help="Build the production plan that would be used for an ARA deepening task.",
+    )
+    experiments_plan.add_argument("--profile", default="production-open", help="Experiment execution profile.")
+    experiments_plan.add_argument("--task", required=True, help="ARA research-deepening task package JSON path.")
+    experiments_plan.add_argument("--source-bundle", help="Optional source AIRA result bundle being deepened.")
+    experiments_plan.add_argument("--out", help="Optional output plan JSON path.")
+    experiments_plan.add_argument("--json", action="store_true", help="Print JSON output.")
     experiments_evaluate = experiments_sub.add_parser(
         "evaluate",
         help="Evaluate a production-local experiment bundle and append report artifacts.",
@@ -193,6 +212,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload = run_production_experiment(args.profile, args.plan, Path(args.out))
         _print_payload(payload, as_json=args.json)
         return 0 if payload["status"] == "passed" else 1
+
+    if args.command == "experiments" and args.experiments_command == "deepen":
+        payload = run_ara_deepening_experiment(
+            profile_name=args.profile,
+            task_package=args.task,
+            source_bundle=args.source_bundle,
+            output_dir=Path(args.out),
+        )
+        _print_payload(payload, as_json=args.json)
+        return 0 if payload["status"] == "passed" else 1
+
+    if args.command == "experiments" and args.experiments_command == "build-deepening-plan":
+        payload = build_ara_deepening_plan(
+            args.task,
+            source_bundle=args.source_bundle,
+            profile_name=args.profile,
+        )
+        if args.out:
+            Path(args.out).expanduser().write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _print_payload(payload, as_json=args.json)
+        return 0
 
     if args.command == "experiments" and args.experiments_command == "evaluate":
         payload = evaluate_production_bundle(Path(args.bundle))
